@@ -1,0 +1,1913 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="A model rocket flight simulator: pick a kit and engine, then watch the flight and see apogee, speed, deploy and drift.">
+<style>
+html, body { margin: 0; }
+img { max-width: 100%; }
+[hidden] { display: none !important; }
+:root { padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px); }
+</style>
+<title>Rocket Flight Sim</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600&family=Barlow+Semi+Condensed:wght@500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap">
+<style>
+/* Layout: one centered column of panels; setup row, then paired spec panels, then launch row.
+   Look: dark mission-control navy with a rocket-exhaust orange accent and
+   condensed industrial headings like the lettering on launch hardware. One deliberate dark theme. */
+:root {
+  --bg: #0A0F1A;
+  --panel: #121A2B;
+  --line: #24304A;
+  --field-line: #2A3755;
+  --fg: #E8ECF4;
+  --soft: #C7D0E0;
+  --muted: #9AA6BD;
+  --accent: #FF7A2F;
+  --accent-soft: #FFA06B;
+  --on-accent: #0A0F1A;
+  --tag-line: #5A3A28;
+  --error: #FF9C9C;
+  --apogee: #FF5A5A;
+  --warn: #FFC857;
+  --ok: #7BD88F;
+  --sky: #0E1526;
+  --alt: #6CB6FF;
+  --flame: #FFA06B;
+  --ring: rgba(255, 122, 47, .25);
+  --notice-bg: rgba(255, 122, 47, .07);
+  --stats-bg: rgba(10, 15, 26, .86);
+  --display: 'Barlow Semi Condensed', 'Arial Narrow', 'Helvetica Neue', Arial, sans-serif;
+  --sans: 'Barlow', system-ui, -apple-system, 'Segoe UI', Arial, sans-serif;
+  --mono: 'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+  color-scheme: dark;
+}
+html { background: var(--bg); }
+body { background: var(--bg); color: var(--fg); font-family: var(--sans); font-size: 16px; line-height: 1.5; }
+.wrap { max-width: 1120px; margin: 0 auto; padding-block: 48px 96px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); display: flex; flex-direction: column; gap: 24px; }
+header { display: flex; flex-direction: column; gap: 12px; }
+.kicker { display: flex; align-items: center; gap: 10px; font-family: var(--mono); font-size: 13px; font-weight: 600; letter-spacing: 2px; color: var(--accent); }
+h1 { margin: 0; font-size: clamp(28px, 4.5vw, 40px); line-height: 1.15; font-weight: 700; text-wrap: balance; }
+h2 { margin: 0; font-size: 20px; font-weight: 600; }
+.lede { margin: 0; font-size: 17px; color: var(--muted); max-width: 640px; }
+.head-row { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 16px; }
+.panel { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 28px; display: flex; flex-direction: column; gap: 20px; min-width: 0; }
+.setup { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 28px; }
+.grid2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(340px, 100%), 1fr)); gap: 24px; }
+.group { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.lab { font-size: 14px; font-weight: 500; color: var(--soft); }
+.lab-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.hint { font-size: 13px; color: var(--muted); line-height: 1.45; }
+.field { display: flex; align-items: center; gap: 10px; background: var(--bg); border: 1px solid var(--field-line); border-radius: 10px; padding: 0 14px; transition: border-color .15s, box-shadow .15s; }
+.field:focus-within { border-color: var(--accent); box-shadow: 0 0 0 3px var(--ring); }
+.field.bad { border-color: var(--error); }
+.field input, .field select { flex: 1; min-width: 0; height: 44px; background: transparent; border: 0; color: var(--fg); font: inherit; font-size: 16px; outline: none; }
+.field input[type=number] { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+.field select { padding: 0; cursor: pointer; }
+.field select option { background: var(--panel); color: var(--fg); }
+.unit { font-family: var(--mono); font-size: 14px; color: var(--muted); white-space: nowrap; }
+.err { font-size: 13px; color: var(--error); }
+.tag { font-family: var(--mono); font-size: 12px; color: var(--accent-soft); border: 1px solid var(--tag-line); border-radius: 6px; padding: 2px 8px; }
+.seg { display: inline-flex; align-self: flex-start; flex-wrap: wrap; padding: 4px; gap: 4px; background: var(--bg); border: 1px solid var(--line); border-radius: 12px; }
+.seg button { min-height: 40px; padding: 0 20px; border: 0; border-radius: 8px; background: transparent; color: var(--soft); font: inherit; font-weight: 500; cursor: pointer; }
+.seg button:hover { color: var(--fg); }
+.seg button[aria-pressed="true"] { background: var(--accent); color: var(--on-accent); font-weight: 600; }
+button:focus-visible, .ghost:focus-visible { outline: 2px solid var(--accent-soft); outline-offset: 2px; }
+.ghost { min-height: 44px; padding: 0 18px; border: 1px solid var(--field-line); border-radius: 10px; background: transparent; color: var(--soft); font: inherit; font-weight: 500; cursor: pointer; }
+.ghost:hover { border-color: var(--muted); color: var(--fg); }
+.launch { min-height: 56px; border: 0; border-radius: 12px; background: var(--accent); color: var(--on-accent); font: inherit; font-size: 18px; font-weight: 700; letter-spacing: 1px; cursor: pointer; }
+.launch:hover { background: var(--accent-soft); }
+.ready { justify-content: space-between; }
+.sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+/* Results */
+.summary { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(200px, 100%), 1fr)); gap: 12px 24px; margin: 0; }
+.summary div { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.summary dt { font-size: 12px; letter-spacing: 1px; text-transform: uppercase; color: var(--muted); }
+.summary dd { margin: 0; font-family: var(--mono); font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.slot { border: 1.5px dashed var(--field-line); border-radius: 16px; padding: 28px; min-height: 220px; display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 8px; text-align: center; color: var(--muted); }
+.slot strong { color: var(--soft); font-size: 17px; }
+.slot.tall { min-height: 320px; }
+.suggest { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.suggest:empty { display: none; }
+.suggest-lab { font-size: 13px; color: var(--muted); margin-right: 2px; }
+.chip { min-height: 40px; padding: 0 14px; border: 1px solid var(--field-line); border-radius: 999px; background: transparent; color: var(--fg); font: inherit; font-size: 14px; cursor: pointer; }
+.chip:hover { border-color: var(--accent); }
+.chip .sub { color: var(--muted); margin-left: 6px; font-size: 12px; }
+.hint.ok, .status.ok { color: var(--ok); }
+.hint.bad { color: var(--error); }
+.status { font-size: 14px; line-height: 1.5; color: var(--muted); display: flex; flex-direction: column; gap: 10px; align-items: flex-start; }
+.status .note { color: var(--muted); font-size: 13px; }
+.notice { border: 1px solid var(--tag-line); background: var(--notice-bg); border-radius: 12px; padding: 14px 18px; display: flex; flex-direction: column; gap: 6px; font-size: 14px; line-height: 1.5; color: var(--soft); }
+.notice strong { color: var(--accent-soft); }
+.link-btn { background: none; border: 0; padding: 0; font: inherit; color: var(--accent-soft); text-decoration: underline; text-underline-offset: 2px; cursor: pointer; }
+.link-btn:hover { color: var(--accent); }
+textarea { width: 100%; box-sizing: border-box; background: var(--bg); border: 1px solid var(--field-line); border-radius: 10px; padding: 12px 14px; color: var(--fg); font: inherit; font-size: 16px; line-height: 1.5; resize: vertical; }
+textarea:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--ring); }
+.fine { border-top: 1px solid var(--line); padding-top: 20px; display: flex; flex-direction: column; gap: 8px; font-size: 13px; line-height: 1.55; color: var(--muted); max-width: 760px; }
+.fine p { margin: 0; }
+.fine strong { color: var(--soft); }
+.rate { border: 0; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.rate legend { padding: 0; margin-bottom: 10px; font-size: 15px; font-weight: 500; color: var(--fg); }
+.scale { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.scale .end { font-size: 13px; color: var(--muted); }
+.scale input { position: absolute; opacity: 0; width: 1px; height: 1px; }
+.scale label { min-width: 44px; min-height: 44px; display: inline-flex; align-items: center; justify-content: center; border: 1px solid var(--field-line); border-radius: 10px; font-family: var(--mono); font-size: 16px; color: var(--soft); cursor: pointer; }
+.scale label:hover { border-color: var(--accent); color: var(--fg); }
+.scale input:checked + label { background: var(--accent); border-color: var(--accent); color: var(--on-accent); font-weight: 600; }
+.scale input:focus-visible + label { outline: 2px solid var(--accent-soft); outline-offset: 2px; }
+.ready-links { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; font-size: 15px; color: var(--muted); }
+.ready-links .link-btn { min-height: 44px; }
+dialog#browse { width: min(780px, calc(100vw - 32px)); max-height: min(84vh, 760px); padding: 0; border: 1px solid var(--line); border-radius: 8px; background: var(--panel); color: var(--fg); box-shadow: 0 18px 50px rgba(20, 23, 28, .25); }
+dialog#browse::backdrop { background: rgba(0, 0, 0, .6); }
+.browse-inner { display: flex; flex-direction: column; gap: 14px; padding: 24px; max-height: min(84vh, 760px); box-sizing: border-box; }
+.browse-filters { display: flex; flex-wrap: wrap; gap: 6px; }
+.browse-filters:empty { display: none; }
+.chip.on { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
+.browse-list { overflow-y: auto; min-height: 120px; border-top: 1px solid var(--line); margin: 0 -24px -24px; padding: 4px 0 12px; }
+.browse-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px 16px; align-items: baseline; width: 100%; padding: 11px 24px; border: 0; border-bottom: 1px solid var(--line); background: transparent; color: var(--fg); font: inherit; text-align: left; cursor: pointer; }
+.browse-row:hover, .browse-row:focus-visible { background: var(--notice-bg); outline: none; }
+.browse-row .nm { font-weight: 600; min-width: 0; overflow-wrap: anywhere; }
+.browse-row .meta { font-family: var(--mono); font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; text-align: right; }
+.browse-row .sub { grid-column: 1 / -1; font-size: 13px; color: var(--muted); }
+.browse-link { font-size: 14px; align-self: flex-start; min-height: 32px; }
+@media (max-width: 560px) { .browse-row { grid-template-columns: 1fr; } .browse-row .meta { text-align: left; } }
+.chart-head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-start; gap: 16px; }
+.chart { display: block; width: 100%; height: 240px; touch-action: pan-y; cursor: crosshair; }
+#thrust-chart { height: 260px; cursor: default; }
+.kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 16px; margin: 0; }
+.kpis div { display: flex; flex-direction: column; gap: 2px; }
+.kpis dt { font-size: 12px; letter-spacing: 1px; text-transform: uppercase; color: var(--muted); }
+.kpis dd { margin: 0; font-family: var(--mono); font-variant-numeric: tabular-nums; font-size: 20px; font-weight: 600; }
+.readout { font-family: var(--mono); font-variant-numeric: tabular-nums; font-size: 14px; color: var(--soft); min-height: 21px; }
+.chart-label { display: flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 500; color: var(--soft); margin-bottom: -12px; }
+.swatch { width: 14px; height: 4px; border-radius: 2px; }
+.swatch.alt { background: var(--alt); } .swatch.spd { background: var(--accent); }
+.toolbar { display: flex; gap: 10px; flex-wrap: wrap; }
+.stage { position: relative; background: var(--sky); border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+.stage canvas { display: block; width: 100%; height: clamp(440px, 70vh, 660px); }
+.stats { position: absolute; top: 20px; left: 84px; width: 270px; padding: 18px; background: var(--stats-bg); border: 1px solid var(--line); border-radius: 12px; display: flex; flex-direction: column; gap: 14px; z-index: 1; max-height: calc(100% - 90px); overflow-y: auto; }
+.stats dl { margin: 0; display: flex; flex-direction: column; gap: 9px; }
+.stats .row { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
+.stats dt { font-size: 13px; color: var(--muted); }
+.stats dd { margin: 0; font-family: var(--mono); font-variant-numeric: tabular-nums; font-size: 15px; font-weight: 600; color: var(--fg); text-align: right; }
+.stats dd.pending { color: var(--field-line); }
+.stats .apo dd { color: var(--apogee); }
+.concerns-h { font-size: 12px; letter-spacing: 1px; text-transform: uppercase; color: var(--muted); border-top: 1px solid var(--line); padding-top: 12px; }
+.concerns { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; font-size: 13px; line-height: 1.45; color: var(--soft); }
+.concerns li { display: grid; grid-template-columns: 10px 1fr; gap: 8px; }
+.concerns li::before { content: ""; width: 8px; height: 8px; border-radius: 50%; margin-top: 6px; background: var(--muted); }
+.concerns li.warn::before { background: var(--warn); }
+.concerns li.ok::before { background: var(--ok); }
+.concerns li.pending { color: var(--muted); }
+@media (max-width: 760px) {
+  .stats { position: static; width: auto; max-height: none; border: 0; border-bottom: 1px solid var(--line); border-radius: 0; background: var(--panel); }
+  .stage canvas { height: 440px; }
+}
+h1, h2, .kicker, .launch, .chart-head h2, .seg button, .concerns-h, .kpis dt, .summary dt, .stats dt { font-family: var(--display); }
+h1 { font-size: clamp(30px, 5vw, 46px); font-weight: 700; letter-spacing: -0.2px; line-height: 1.05; }
+h2 { font-size: 22px; font-weight: 600; letter-spacing: 0.2px; }
+.kicker { font-size: 15px; font-weight: 700; letter-spacing: 2.5px; }
+.launch { font-size: 20px; letter-spacing: 2px; }
+.panel { box-shadow: none; }
+.stats dt, .kpis dt, .summary dt { font-size: 14px; letter-spacing: .3px; }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+</head>
+<body>
+
+
+<div class="wrap">
+  <!-- SETUP VIEW -->
+  <main id="setup-view" style="display:flex;flex-direction:column;gap:24px">
+    <header>
+      <div class="kicker">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2c3 3 4.5 6.5 4.5 10.5V17h-9v-4.5C7.5 8.5 9 5 12 2z"/><path d="M7.5 13L4 17v2h3.5"/><path d="M16.5 13L20 17v2h-3.5"/><path d="M10.5 20.5L12 23l1.5-2.5"/></svg>
+        ROCKET FLIGHT SIM <span style="color:var(--muted);font-weight:500">· BETA</span>
+      </div>
+      <div class="head-row">
+        <div style="display:flex;flex-direction:column;gap:12px;min-width:0">
+          <h1>Enter your rocket's dimensions and specs</h1>
+          <p class="lede">Fill in what you know. If you leave the launch conditions blank it just uses normal launch day values.</p>
+        </div>
+        <div style="display:flex;gap:10px;flex-wrap:wrap">
+          <button type="button" class="ghost" id="load-example">Load example rocket</button>
+          <button type="button" class="ghost" id="clear-all">Clear</button>
+        </div>
+      </div>
+    </header>
+
+    <aside class="notice" role="note">
+      <div><strong>Still a work in progress.</strong> Not every kit is in here yet. If yours isn't, pick No under "Is it a kit?" and type in the specs.</div>
+      <div>Numbers can be off sometimes. If something looks wrong, change it or <button type="button" class="link-btn" data-open-report>report it</button>.</div>
+    </aside>
+
+    <section class="panel setup" aria-label="Setup">
+      <div class="group">
+        <div class="lab" id="units-lab">Units</div>
+        <div class="seg" role="group" aria-labelledby="units-lab" data-group="units">
+          <button type="button" data-value="metric" aria-pressed="true">Metric</button>
+          <button type="button" data-value="imperial" aria-pressed="false">Imperial</button>
+        </div>
+      </div>
+      <div class="group">
+        <label class="lab" for="engine">Engine</label>
+        <div class="field" id="engine-field">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg>
+          <input id="engine" type="text" autocomplete="off" placeholder="e.g. Estes C6-5">
+        </div>
+        <div class="hint" id="engine-hint" aria-live="polite">Type the code printed on the engine, like C6-5.</div>
+        <div class="suggest" id="engine-suggest"></div>
+        <button type="button" class="link-btn browse-link" data-browse="engines">View all engines</button>
+      </div>
+      <div class="group">
+        <div class="lab" id="kit-lab">Is it a kit?</div>
+        <div class="seg" role="group" aria-labelledby="kit-lab" data-group="kit">
+          <button type="button" data-value="yes" aria-pressed="false">Yes</button>
+          <button type="button" data-value="no" aria-pressed="true">No</button>
+        </div>
+        <div class="hint">Pick a kit to fill everything in, or choose No to enter it yourself.</div>
+        <button type="button" class="link-btn browse-link" data-browse="kits">View all kits</button>
+      </div>
+    </section>
+
+    <section class="panel" id="kit-panel" hidden>
+      <h2>Find your kit</h2>
+      <div class="field" id="kit-field">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg>
+        <label for="kit" class="sr">Search kits</label>
+        <input id="kit" type="text" autocomplete="off" placeholder="Search kits, e.g. Estes Alpha III" style="height:48px">
+      </div>
+      <div class="suggest" id="kit-suggest"></div>
+      <button type="button" class="link-btn browse-link" data-browse="kits">View all kits</button>
+      <div class="status" id="kit-status" aria-live="polite">Start typing your kit's name, like Big Bertha or Goblin.</div>
+    </section>
+
+    <div class="grid2" id="manual-panels">
+      <section class="panel">
+        <h2>Rocket body</h2>
+        <div class="group">
+          <label class="lab" for="len">Total length</label>
+          <div class="field"><input id="len" type="number" min="0" step="any" placeholder="0" data-dim="len"><span class="unit" data-unit="len">mm</span></div>
+        </div>
+        <div class="group">
+          <label class="lab" for="dia">Diameter of body</label>
+          <div class="field"><input id="dia" type="number" min="0" step="any" placeholder="0" data-dim="len"><span class="unit" data-unit="len">mm</span></div>
+        </div>
+        <div class="group">
+          <label class="lab" for="wall">Thickness of body</label>
+          <div class="field"><input id="wall" type="number" min="0" step="any" placeholder="0" data-dim="len"><span class="unit" data-unit="len">mm</span></div>
+        </div>
+        <div class="group">
+          <label class="lab" for="mat">Material of body</label>
+          <div class="field"><select id="mat"><option>Cardboard</option><option>Phenolic</option><option>Fiberglass</option><option>Carbon fiber</option><option>Plastic</option></select></div>
+        </div>
+        <div class="group">
+          <label class="lab" for="fins">Number of fins</label>
+          <div class="field"><input id="fins" type="number" min="1" max="8" step="1" placeholder="3"></div>
+        </div>
+      </section>
+
+      <section class="panel">
+        <h2>Nose</h2>
+        <div class="group">
+          <label class="lab" for="shape">Shape</label>
+          <div class="field"><select id="shape"><option>Ogive</option><option>Conical</option><option>Elliptical</option><option>Parabolic</option></select></div>
+        </div>
+        <div class="group">
+          <label class="lab" for="nlen">Length</label>
+          <div class="field"><input id="nlen" type="number" min="0" step="any" placeholder="0" data-dim="len"><span class="unit" data-unit="len">mm</span></div>
+        </div>
+        <div class="group">
+          <label class="lab" for="nmat">Mass / material</label>
+          <div class="field"><select id="nmat"><option>Plastic</option><option>Balsa</option><option>3D printed (PLA)</option><option>Fiberglass</option><option value="custom">Custom mass…</option></select></div>
+        </div>
+        <div class="group" id="nmass-group" hidden>
+          <label class="lab" for="nmass">Nose mass</label>
+          <div class="field"><input id="nmass" type="number" min="0" step="any" placeholder="0" data-dim="mass"><span class="unit" data-unit="mass">g</span></div>
+        </div>
+      </section>
+
+      <section class="panel">
+        <h2>Total weight</h2>
+        <div class="group">
+          <label class="lab" for="dry">Dry weight</label>
+          <div class="field"><input id="dry" type="number" min="0" step="any" placeholder="0" data-dim="mass"><span class="unit" data-unit="mass">g</span></div>
+          <div class="hint">Weigh it without the engine for the most accurate results. An estimate also works.</div>
+        </div>
+        <div class="group">
+          <label class="lab" for="payload">Additional payload mass</label>
+          <div class="field"><input id="payload" type="number" min="0" step="any" placeholder="0" data-dim="mass"><span class="unit" data-unit="mass">g</span></div>
+          <div class="hint">Altimeter, camera, or anything else riding along.</div>
+        </div>
+      </section>
+
+      <section class="panel">
+        <h2>Recovery</h2>
+        <div class="seg" role="group" aria-label="Recovery type" data-group="recovery">
+          <button type="button" data-value="parachute" aria-pressed="true">Parachute</button>
+          <button type="button" data-value="streamer" aria-pressed="false">Streamer</button>
+        </div>
+        <div class="group">
+          <label class="lab" for="chute" id="chute-lab">Parachute diameter</label>
+          <div class="field"><input id="chute" type="number" min="0" step="any" placeholder="0" data-dim="chute"><span class="unit" data-unit="chute">cm</span></div>
+        </div>
+        <div class="group">
+          <div class="lab" id="deploy-lab">Deploy timing</div>
+          <div class="seg" role="group" aria-labelledby="deploy-lab" data-group="deploy">
+            <button type="button" data-value="engine" aria-pressed="true">Engine delay</button>
+            <button type="button" data-value="custom" aria-pressed="false">Custom</button>
+          </div>
+          <div class="hint" id="deploy-hint">Uses the delay printed on your engine (the last number, like the 5 in C6-5).</div>
+          <div class="group" id="delay-group" hidden>
+            <label class="hint" for="delay">Seconds after burnout, if you've drilled or changed the delay</label>
+            <div class="field" style="max-width:220px"><input id="delay" type="number" min="0" step="0.5" placeholder="0"><span class="unit">s</span></div>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <div class="grid2">
+      <section class="panel">
+        <h2>Launch conditions</h2>
+        <div class="group">
+          <div class="lab-row"><label class="lab" for="rod">Rod length</label><span class="tag" id="rod-tag">AUTO 0.9 m</span></div>
+          <div class="field"><input id="rod" type="number" min="0" step="any" placeholder="0.9" data-dim="rod"><span class="unit" data-unit="rod">m</span></div>
+          <div class="hint" id="rod-note">Changes with your engine: 3 ft for A–D, 6 ft for E–G, 8 ft rail for H and up.</div>
+        </div>
+        <div class="group">
+          <div class="lab-row"><label class="lab" for="angle">Launch angle</label><span class="tag">AUTO 5°</span></div>
+          <div class="field"><input id="angle" type="number" min="0" max="30" step="any" placeholder="5"><span class="unit">° from vertical</span></div>
+        </div>
+        <div class="group">
+          <div class="lab-row"><label class="lab" for="wind">Wind speed</label><span class="tag" id="wind-tag">AUTO 8 km/h</span></div>
+          <div class="field"><input id="wind" type="number" min="0" step="any" placeholder="8" data-dim="wind"><span class="unit" data-unit="wind">km/h</span></div>
+        </div>
+        <div class="hint">Leave any of these blank to use the AUTO value.</div>
+      </section>
+
+      <section class="panel ready">
+        <button type="button" class="launch" id="launch">LAUNCH</button>
+        <div class="err" id="launch-err" role="alert" hidden></div>
+        <p class="hint" style="font-size:15px;margin:0">Shows apogee, top speed, deploy speed and where it lands.</p>
+        <div class="ready-links">
+          <button type="button" class="link-btn" data-open-survey>Rate site</button>
+          <span aria-hidden="true">|</span>
+          <button type="button" class="link-btn" data-open-report>Report a problem</button>
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <!-- RESULTS VIEW -->
+  <main id="results-view" hidden style="display:flex;flex-direction:column;gap:24px">
+    <header>
+      <div class="kicker">FLIGHT RESULTS</div>
+      <div class="head-row">
+        <h1 id="results-title">Flight results</h1>
+        <div class="toolbar">
+          <button type="button" class="ghost" data-open-report>Report a problem</button>
+          <button type="button" class="ghost" id="replay">Replay</button>
+          <button type="button" class="ghost" id="skip">Skip to end</button>
+          <button type="button" class="ghost" id="back">Edit rocket</button>
+        </div>
+      </div>
+    </header>
+    <section class="stage" aria-label="Flight">
+      <div class="stats" aria-live="polite">
+        <dl>
+          <div class="row apo"><dt>Apogee</dt><dd id="s-apo" class="pending">—</dd></div>
+          <div class="row"><dt>Max speed</dt><dd id="s-vmax" class="pending">—</dd></div>
+          <div class="row"><dt>Max acceleration</dt><dd id="s-amax" class="pending">—</dd></div>
+          <div class="row"><dt>Speed off rod</dt><dd id="s-rod" class="pending">—</dd></div>
+          <div class="row"><dt>Height at deploy</dt><dd id="s-dh" class="pending">—</dd></div>
+          <div class="row"><dt>Speed at deploy</dt><dd id="s-dv" class="pending">—</dd></div>
+          <div class="row"><dt>Drift</dt><dd id="s-drift" class="pending">—</dd></div>
+        </dl>
+        <div class="concerns-h">Concerns</div>
+        <ul class="concerns" id="concerns"><li class="pending">Shown after landing.</li></ul>
+      </div>
+      <canvas id="sky" role="img" aria-label="Animated flight path showing launch, apogee, recovery and landing"></canvas>
+    </section>
+    <p class="hint" style="margin:0">These are estimates. The thrust curve is approximated from the engine code and drag is simplified, so treat it like a ballpark.</p>
+    <section class="panel">
+      <h2>Your rocket</h2>
+      <dl class="summary" id="summary"></dl>
+    </section>
+    <section class="panel">
+      <div class="chart-head">
+        <div style="display:flex;flex-direction:column;gap:4px;min-width:0">
+          <h2>Thrust curve</h2>
+          <div class="hint" id="thrust-sub"></div>
+        </div>
+      </div>
+      <dl class="kpis" id="thrust-kpis"></dl>
+      <canvas class="chart" id="thrust-chart" role="img" aria-label="Engine thrust over time"></canvas>
+    </section>
+    <section class="panel">
+      <div class="chart-head">
+        <div style="display:flex;flex-direction:column;gap:4px;min-width:0">
+          <h2>Altitude and speed</h2>
+          <div class="hint">Time runs left to right. Tap or hover to read exact values.</div>
+        </div>
+        <div class="seg" role="group" aria-label="Time range" data-group="range">
+          <button type="button" data-value="full" aria-pressed="true">Full flight</button>
+          <button type="button" data-value="ascent" aria-pressed="false">Ascent</button>
+        </div>
+      </div>
+      <div class="readout" id="readout" aria-live="polite">&nbsp;</div>
+      <div class="chart-label"><span class="swatch alt"></span>Altitude</div>
+      <canvas class="chart" id="alt-chart" role="img" aria-label="Altitude over time"></canvas>
+      <div class="chart-label"><span class="swatch spd"></span>Speed</div>
+      <canvas class="chart" id="spd-chart" role="img" aria-label="Speed over time"></canvas>
+    </section>
+  </main>
+
+  <section class="panel" id="report-panel" hidden aria-labelledby="report-h">
+    <div class="chart-head">
+      <h2 id="report-h">Report a problem</h2>
+      <button type="button" class="ghost" id="report-close">Close</button>
+    </div>
+    <p class="hint" style="margin:0">Something off, like a kit spec that doesn't match the box or a missing engine? Let us know. Your engine and kit get sent with it.</p>
+    <div class="group">
+      <label class="lab" for="rep-kind">What's wrong?</label>
+      <div class="field"><select id="rep-kind">
+        <option>Wrong kit specs</option>
+        <option>Wrong engine info</option>
+        <option>Missing kit or engine</option>
+        <option>Results look wrong</option>
+        <option>Something's broken</option>
+        <option>Other</option>
+      </select></div>
+    </div>
+    <div class="group">
+      <label class="lab" for="rep-text">Details</label>
+      <textarea id="rep-text" maxlength="2000" rows="4" placeholder="ex. the Goblin has 4 fins not 3"></textarea>
+    </div>
+    <div style="display:flex;flex-wrap:wrap;align-items:center;gap:14px">
+      <button type="button" class="launch" id="rep-send" style="min-height:48px;padding:0 28px;font-size:16px">Send report</button>
+      <div class="hint" id="rep-status" aria-live="polite"></div>
+    </div>
+  </section>
+
+  <section class="panel" id="survey" aria-labelledby="survey-h" hidden>
+    <div class="chart-head">
+      <h2 id="survey-h">Rate the site</h2>
+      <button type="button" class="ghost" id="survey-close">Close</button>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:6px">
+      <p class="hint" style="margin:0">Takes like 30 seconds. Skip whatever you want.</p>
+    </div>
+    <form id="survey-form" style="display:flex;flex-direction:column;gap:22px" novalidate>
+      <fieldset class="rate" data-q="navigate">
+        <legend>How easy was the site to get around?</legend>
+        <div class="scale"></div>
+      </fieldset>
+      <fieldset class="rate" data-q="read">
+        <legend>How clear were the layout and text?</legend>
+        <div class="scale"></div>
+      </fieldset>
+      <fieldset class="rate" data-q="understand">
+        <legend>How easy were the results to understand?</legend>
+        <div class="scale"></div>
+      </fieldset>
+      <fieldset class="rate" data-q="useAgain">
+        <legend>How likely are you to use it again?</legend>
+        <div class="scale"></div>
+      </fieldset>
+      <div class="group">
+        <label class="lab" for="sv-else">Anything else you'd like to tell us?</label>
+        <textarea id="sv-else" maxlength="2000" rows="3" placeholder="What worked, what was confusing, what you'd add"></textarea>
+      </div>
+      <div class="group">
+        <label class="lab" for="sv-rocket">Want to help? Tell us about a rocket kit we don't have yet.</label>
+        <div class="hint">Whatever you know helps: name, length, diameter, weight, fins, chute size, engines.</div>
+        <textarea id="sv-rocket" maxlength="2000" rows="4" placeholder="Kit name and maker, length, diameter, weight, fins, parachute size…"></textarea>
+      </div>
+      <div style="display:flex;flex-wrap:wrap;align-items:center;gap:14px">
+        <button type="submit" class="launch" id="sv-send" style="min-height:48px;padding:0 28px;font-size:16px">Send feedback</button>
+        <div class="hint" id="sv-status" aria-live="polite"></div>
+      </div>
+    </form>
+  </section>
+
+  <dialog id="browse" aria-labelledby="browse-h">
+    <div class="browse-inner">
+      <div class="chart-head">
+        <h2 id="browse-h">All engines</h2>
+        <button type="button" class="ghost" id="browse-close">Close</button>
+      </div>
+      <div class="field">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-4-4"/></svg>
+        <label for="browse-q" class="sr">Filter the list</label>
+        <input id="browse-q" type="text" autocomplete="off" placeholder="Filter">
+      </div>
+      <div class="browse-filters" id="browse-makers" role="group" aria-label="Maker"></div>
+      <div class="browse-filters" id="browse-classes" role="group" aria-label="Engine class"></div>
+      <div class="hint" id="browse-count" aria-live="polite"></div>
+      <div class="browse-list" id="browse-list"></div>
+    </div>
+  </dialog>
+
+  <footer class="fine">
+    <p><strong>For planning and learning only.</strong> This isn't a replacement for OpenRocket or your RSO. Results are estimates and the kit and engine data might have mistakes. Always follow the NAR or Tripoli safety code.</p>
+    <p>Use it at your own risk. We aren't responsible for any damage, injury, or loss from relying on it.</p>
+  </footer>
+</div>
+
+<script>
+(function () {
+  var $ = function (id) { return document.getElementById(id); };
+  var KEY = 'rfs-draft-v1';
+  var state = { units: 'metric', kit: 'no', recovery: 'parachute', deploy: 'engine', kitPicked: '', range: 'full' };
+
+  /* ---------- Kit + engine catalogs ---------- */
+  // Length, diameter, weight, parachute and engines from each maker's product page (SI units).
+  // Fin counts aren't published on those pages, so they're the usual count for the design; users can edit after picking.
+  var KITS = [
+    { name: 'Estes Alpha III', len: 0.307, dia: 0.025, dry: 0.034, fins: 3, recovery: 'parachute', rec: 0.305, engines: '1/2A6-2, A8-3, A8-5, B4-4, B6-4, B6-6, C6-5, C6-7' },
+    { name: 'Estes Crossfire ISX', alias: 'tandem x', len: 0.396, dia: 0.025, dry: 0.037, fins: 3, finsChecked: true, recovery: 'parachute', rec: 0.305, engines: 'A8-3, B4-4, B6-4, C6-5, C6-7', note: 'Estes lists both a 12 in and an 18 in parachute for this one. This uses 12 in.' },
+    { name: 'Estes Amazon', alias: 'tandem x', len: 0.747, dia: 0.034, dry: 0.085, fins: 4, finsChecked: true, recovery: 'parachute', rec: 0.457, engines: 'B4-2, B4-4, B6-2, B6-4, C5-3, C6-3, C6-5' },
+    { name: 'Estes U.S. Army Patriot M-104', alias: 'patriot', len: 0.541, dia: 0.042, dry: 0.0567, fins: 4, recovery: 'parachute', rec: 0.305, engines: 'B4-4, B6-4, B6-6, C6-5' },
+    { name: 'Estes Big Daddy', len: 0.483, dia: 0.076, dry: 0.1503, fins: 4, recovery: 'parachute', rec: 0.61, engines: 'C11-3, D12-3, D12-5, E12-4, E12-6' },
+    { name: 'Estes Hi-Flier XL', alias: 'hiflier hi flier', len: 0.787, dia: 0.042, dry: 0.0992, fins: 3, finsChecked: true, recovery: 'parachute', rec: 0.457, engines: 'C11-3, D12-5, D12-7, E12-6, E12-8' },
+    { name: 'Estes Cherokee-E', alias: 'cherokee', len: 0.75, dia: 0.033, dry: 0.163, fins: 3, finsChecked: true, recovery: 'parachute', rec: 0.457, engines: 'D12-5, D12-7, E12-6' },
+    { name: 'Estes Vapor', len: 1.148, dia: 0.042, dry: 0.0992, fins: 3, recovery: 'parachute', rec: 0.457, engines: 'D12-5, E12-6' },
+    { name: 'Estes Mean Machine', len: 2.007, dia: 0.042, dry: 0.241, fins: 4, recovery: 'parachute', rec: 0.61, engines: 'D12-3, D12-5, E12-4, E12-6' },
+    { name: 'Estes Super Big Bertha', alias: 'super bertha', len: 0.935, dia: 0.066, dry: 0.2523, fins: 4, recovery: 'parachute', rec: 0.61, engines: 'E16-4, F15-6' },
+    { name: 'Estes Der Big Red Max', alias: 'der red max', len: 0.759, dia: 0.076, dry: 0.411, fins: 4, recovery: 'parachute', rec: 0.457, engines: 'E16-4, F15-4' },
+    { name: 'AeroTech Initiator', alias: 'aero tech', len: 0.99, dia: 0.067, wall: 0.0015, dry: 0.40, fins: 3, recovery: 'parachute', rec: 0.61, mat: 'Phenolic', engines: '29 mm motors (24 mm with the adapter)' },
+    { name: 'LOC Precision Goblin 4"', alias: 'loc goblin 4 inch', len: 1.035, dia: 0.1016, wall: 0.0015, dry: 1.19, fins: 4, finsChecked: true, recovery: 'parachute', rec: 0.914, engines: '29, 38 or 54 mm motors, usually H and up', note: 'Finished builds often weigh more than the listed 42 oz, so weigh yours if you can.' },
+    {"name": "Estes Big Bertha", "len": 0.6096, "dia": 0.0417, "dry": 0.0709, "fins": 4, "recovery": "parachute", "rec": 0.4572, "engines": "B4-2, B4-4, B6-2, B6-4, C6-5", "alias": "classic bertha"},
+    {"name": "Estes Baby Bertha", "len": 0.3251, "dia": 0.0417, "dry": 0.0539, "fins": 4, "recovery": "parachute", "rec": 0.3048, "engines": "A8-3, B4-4, B6-4, C6-5", "alias": "bertha"},
+    {"name": "Estes Hi-Flier", "len": 0.3048, "dia": 0.0188, "dry": 0.0312, "fins": 3, "recovery": "streamer", "rec": 0.0508, "engines": "1/2A6-2, A8-3, A8-5, B4-4, B6-4, B6-6, C6-5, C6-7", "alias": "hiflier hi flier classic", "note": "The maker doesn't list the streamer size, so it uses a typical 2 in wide streamer."},
+    {"name": "Estes Wizard", "len": 0.3048, "dia": 0.0188, "dry": 0.0142, "fins": 4, "recovery": "streamer", "rec": 0.0508, "engines": "1/2A6-2, A8-3, A8-5, B4-4, B6-4, B6-6, C6-5, C6-7", "note": "The maker doesn't list the streamer size, so it uses a typical 2 in wide streamer."},
+    {"name": "Estes Viking", "len": 0.3073, "dia": 0.0188, "dry": 0.017, "fins": 4, "recovery": "streamer", "rec": 0.0508, "engines": "1/2A6-2, A8-3, A8-5, B4-4, B6-4, B6-6, C6-5, C6-7", "note": "It comes with 5 fins you can set up 48 ways. This assumes 4. The maker doesn't list the streamer size, so it uses a typical 2 in wide streamer."},
+    {"name": "Estes Star Hopper", "len": 0.188, "dia": 0.0188, "dry": 0.0207, "fins": 3, "recovery": "streamer", "rec": 0.0381, "engines": "1/2A3-2T, A3-4T, A10-3T", "note": "Uses 13 mm mini engines. Weight is Estes' estimate. Streamer is 18 in long, width assumed."},
+    {"name": "Estes Tazz", "len": 0.4216, "dia": 0.0249, "dry": 0.0369, "fins": 3, "recovery": "streamer", "rec": 0.0508, "engines": "A8-3, B6-2, B6-4, C6-3", "note": "The maker doesn't list the streamer size, so it uses a typical 2 in wide streamer."},
+    {"name": "Estes Red Nova", "len": 0.5486, "dia": 0.0417, "dry": 0.085, "fins": 4, "recovery": "parachute", "rec": 0.381, "engines": "C11-3, D12-5, D12-7", "finsChecked": true},
+    {"name": "Estes Laser X2", "len": 0.7417, "dia": 0.0417, "dry": 0.0936, "fins": 4, "recovery": "parachute", "rec": 0.381, "engines": "C5-3, C6-3"},
+    {"name": "Estes So Long", "len": 1.1735, "dia": 0.0307, "dry": 0.163, "fins": 3, "recovery": "streamer", "rec": 0.1, "engines": "E16-6, E16-8, F15-6, F15-8 (single stage)", "note": "Flown as a single stage. The two-stage setup isn't simulated yet. The maker doesn't list the streamer size, so it uses a typical 2 in wide streamer."},
+    {"name": "Estes Pro Series II Crimson Fury", "len": 1.4605, "dia": 0.0635, "dry": 0.4394, "fins": 4, "recovery": "parachute", "rec": 0.6096, "engines": "E16-4, F15-4", "alias": "crimson fury"},
+    {"name": "LOC Precision LOC-IV", "len": 1.1938, "dia": 0.1016, "dry": 0.9072, "fins": 4, "recovery": "parachute", "rec": 0.9144, "engines": "38 mm motors, usually H. F and G with the MMA-2 adapter", "alias": "loc iv loc 4", "wall": 0.0015, "mat": "Phenolic"},
+    {"name": "LOC Precision IRIS", "len": 1.5113, "dia": 0.0787, "dry": 1.0433, "fins": 3, "recovery": "parachute", "rec": 0.9144, "engines": "38 mm motors. 29 mm G motors with the MMA-2 adapter", "alias": "loc iris", "wall": 0.0015, "mat": "Phenolic"},
+    {"name": "LOC Precision EZI-65", "len": 1.4668, "dia": 0.1016, "dry": 1.4515, "fins": 3, "recovery": "parachute", "rec": 0.9144, "engines": "Designed for the AeroTech I65. 54 mm mount, G to I with adapters", "alias": "loc ezi 65", "wall": 0.0015, "mat": "Phenolic"},
+    {"name": "LOC Precision Vulcanite", "len": 1.3462, "dia": 0.0574, "dry": 0.652, "fins": 3, "recovery": "parachute", "rec": 0.7112, "engines": "38 mm motors. F and G with the MMA-2 adapter", "alias": "loc vulcanite", "wall": 0.0015, "mat": "Phenolic"},
+    {"name": "LOC Precision Photon", "len": 0.6604, "dia": 0.0483, "dry": 0.1701, "fins": 3, "recovery": "parachute", "rec": 0.381, "engines": "C to E 24 mm motors", "alias": "loc photon"},
+    {"name": "AeroTech Mega Initiator", "len": 1.524, "dia": 0.1016, "dry": 0.9072, "fins": 3, "recovery": "parachute", "rec": 0.9144, "engines": "54 mm mount, G to K motors", "alias": "aero tech mega", "finsChecked": true, "wall": 0.0015, "mat": "Phenolic"},
+    {"name": "AeroTech Arreaux", "len": 1.0922, "dia": 0.0483, "dry": 0.3402, "fins": 3, "recovery": "parachute", "rec": 0.6096, "engines": "E20-7W, E30-7T, F44-8W, F67-9W, G74-9W, G80-10T, G80-13T", "alias": "enerjet arreaux", "note": "AeroTech doesn't list the parachute size, so it uses a typical 24 in chute.", "finsChecked": true, "mat": "Phenolic"},
+    {"name": "AeroTech G-Force", "len": 1.524, "dia": 0.1016, "dry": 0.9072, "fins": 3, "recovery": "parachute", "rec": 0.9144, "engines": "F67-4W, G74-6W, G80-7T", "alias": "enerjet g force gforce", "note": "AeroTech doesn't list the parachute size, so it uses a typical 36 in chute.", "finsChecked": true},
+    {"name": "AeroTech Astrobee-D", "len": 1.7272, "dia": 0.066, "dry": 0.7938, "fins": 4, "recovery": "parachute", "rec": 0.9144, "engines": "F44-4W, F67-4W, F67-6W, G74-6W, G80-7T", "alias": "enerjet astrobee", "note": "AeroTech doesn't list the parachute size, so it uses a typical 36 in chute.", "finsChecked": true, "mat": "Phenolic"}
+  ];
+  var ENGINES = [
+    'Estes 1/2A6-2',
+    'Estes A8-3',
+    'Estes A8-5',
+    'Estes B4-2',
+    'Estes B4-4',
+    'Estes B6-2',
+    'Estes B6-4',
+    'Estes B6-6',
+    'Estes C5-3',
+    'Estes C6-3',
+    'Estes C6-5',
+    'Estes C6-7',
+    'Estes C11-3',
+    'Estes D12-3',
+    'Estes D12-5',
+    'Estes D12-7',
+    'Estes E12-4',
+    'Estes E12-6',
+    'Estes E12-8',
+    'Estes E16-4',
+    'Estes F15-4',
+    'Estes F15-6',
+    'AeroTech E16-4W',
+    'AeroTech E16-7W',
+    'AeroTech E30-4T',
+    'AeroTech E30-7T',
+    'AeroTech F20-4W',
+    'AeroTech F20-7W',
+    'AeroTech F24-4W',
+    'AeroTech F24-7W',
+    'AeroTech F32-6T',
+    'AeroTech F39-6T',
+    'AeroTech F39-9T',
+    'AeroTech F40-7W',
+    'AeroTech F42-8T',
+    'AeroTech F52-8T',
+    'AeroTech F67-9W',
+    'AeroTech G40-7W',
+    'AeroTech G40-10W',
+    'AeroTech G64-7W',
+    'AeroTech G74-6W',
+    'AeroTech G76-7G',
+    'AeroTech G77-7R',
+    'AeroTech G79-7W',
+    'AeroTech G80-7T',
+    'AeroTech G80-10T',
+    'AeroTech G80T-14A',
+    'AeroTech H100W-14A',
+    'AeroTech H123W-14A',
+    'AeroTech H128W-14A',
+    'AeroTech H135W-14A',
+    'AeroTech H148R-14A',
+    'AeroTech H165R-14A',
+    'AeroTech H180W-14A',
+    'AeroTech H210R-14A',
+    'AeroTech H219T-14A',
+    'AeroTech H220T-14A',
+    'AeroTech H238T-14A',
+    'AeroTech H242T-14A',
+    'AeroTech H250G-14A',
+    'AeroTech H268R-14A',
+    'AeroTech H283ST-14A',
+    'AeroTech H550ST-14A',
+    'AeroTech I161W-14A',
+    'AeroTech I200W-14A',
+    'AeroTech I218R-14A',
+    'AeroTech I284W-14A',
+    'AeroTech I357T-14A',
+    'AeroTech I435T-14A',
+    'AeroTech I600R-14A',
+    'Estes 1/4A3-3T',
+    'Estes 1/2A3-2T',
+    'Estes A3-2T',
+    'Estes A3-4T',
+    'Estes A3-6T',
+    'Estes A10-3T',
+    'Estes C11-5',
+    'Estes E16-6',
+    'Estes E16-8',
+    'Estes F15-2',
+    'Estes F15-8',
+    'AeroTech E20-4W',
+    'AeroTech E20-7W',
+    'AeroTech E23-5T',
+    'AeroTech E28-4T',
+    'AeroTech E28-7T',
+    'AeroTech F44-4W',
+    'AeroTech F44-8W',
+    'AeroTech F67-4W',
+    'AeroTech F67-6W',
+    'AeroTech F50-6T',
+    'AeroTech F26-6FJ',
+    'AeroTech G38-4FJ',
+    'AeroTech G64-10W',
+    'AeroTech G74-9W',
+    'AeroTech G80-13T',
+    'AeroTech G78-7G',
+    'AeroTech H73J-10A',
+    'AeroTech H97J-10A',
+    'AeroTech H115DM-14A',
+    'AeroTech H130W-14A',
+    'AeroTech H170M-14A',
+    'AeroTech H178DM-14A',
+    'AeroTech H182R-14A',
+    'AeroTech H195NT-14A',
+    'AeroTech I115W-14A',
+    'AeroTech I140W-14A',
+    'AeroTech I180W-14A',
+    'AeroTech I205W-14A',
+    'AeroTech I211W-14A',
+    'AeroTech I229T-14A',
+    'AeroTech I245G-14A',
+    'AeroTech I280DM-14A',
+    'AeroTech I285R-14A',
+    'AeroTech I300T-14A',
+    'AeroTech I327DM-14A',
+    'AeroTech I366R-14A',
+    'AeroTech I500T-14A',
+    'Cesaroni 107G83-14A',
+    'Cesaroni 110G250-14A',
+    'Cesaroni 125G131-14A',
+    'Cesaroni 138G106-14A',
+    'Cesaroni 143G150-13A',
+    'Cesaroni 163H133-14A',
+    'Cesaroni 166H175-14A',
+    'Cesaroni 168H410-14A',
+    'Cesaroni 206H237-13A',
+    'Cesaroni 217H170-14A',
+    'Cesaroni 229H255-14A',
+    'Cesaroni 247H143-13A',
+    'Cesaroni 258H180-14A',
+    'Cesaroni 273H225-14A',
+    'Cesaroni 287H340-14A',
+    'Cesaroni 305H226-14A',
+    'Cesaroni 320H565-14A',
+    'AeroTech J90W',
+    'AeroTech J135W',
+    'AeroTech J180T',
+    'AeroTech J250W',
+    'AeroTech J275W',
+    'AeroTech J350W',
+    'AeroTech J415W',
+    'AeroTech J420R',
+    'AeroTech J435WS',
+    'AeroTech J460T',
+    'AeroTech J500G',
+    'AeroTech J570W',
+    'AeroTech J800T',
+    'AeroTech HP-J270W',
+    'AeroTech K185W',
+    'AeroTech K250W',
+    'AeroTech K270W',
+    'AeroTech K480W',
+    'AeroTech K550W',
+    'AeroTech K560W',
+    'AeroTech K695R',
+    'AeroTech K700W',
+    'AeroTech K780R',
+    'AeroTech K1050W',
+    'AeroTech K1100T',
+    'AeroTech HP-K535W',
+    'AeroTech L400W',
+    'AeroTech L850W',
+    'AeroTech L952W',
+    'AeroTech L1090W',
+    'AeroTech L1150R',
+    'AeroTech L1256WS',
+    'AeroTech L1390G',
+    'AeroTech L1520T',
+    'AeroTech L2200G',
+    'AeroTech HP-L1000W',
+    'AeroTech M650W',
+    'AeroTech M750W',
+    'AeroTech M1297W',
+    'AeroTech M1315W',
+    'AeroTech M1419W',
+    'AeroTech M1550R',
+    'AeroTech M1850W',
+    'AeroTech M1939W',
+    'AeroTech M2400T',
+    'AeroTech M2500T',
+    'AeroTech N1000W',
+    'AeroTech N3300R',
+    'AeroTech O5500X-PS',
+    'AeroTech O6000W',
+    'Cesaroni 699J145-19A',
+    'Cesaroni 716J280-16A',
+    'Cesaroni 819J354-16A',
+    'Cesaroni 821J430-18A',
+    'Cesaroni 867J244-14A',
+    'Cesaroni 1016J360-15A',
+    'Cesaroni 1043J380-16A',
+    'Cesaroni 1195J295-16A',
+    'Cesaroni 1266J760-19A',
+    'Cesaroni 1281K360-13A',
+    'Cesaroni 1596K500-18A',
+    'Cesaroni 1633K940-18A',
+    'Cesaroni 1679K630-15A',
+    'Cesaroni 1711K520-17A',
+    'Cesaroni 2108K780-15A',
+    'Cesaroni 2383K820-17A',
+    'Cesaroni 2398K590-15A',
+    'Cesaroni 2412K1085-P',
+    'Cesaroni 2788L1030-P',
+    'Cesaroni 3660L1720-P',
+    'Cesaroni 3727L1050-P',
+    'Cesaroni 4815L1090-P',
+    'Cesaroni 4828L1410-P',
+    'Cesaroni 4864L2375-P',
+    'Cesaroni 4895L1395-P',
+    'Cesaroni 5015L1115-P',
+    'Cesaroni 5069L1685-P',
+    'Cesaroni 5198M1101-P',
+    'Cesaroni 5342M1560-P',
+    'Cesaroni 6026M1670-P',
+    'Cesaroni 6438M1300-P',
+    'Cesaroni 6827M2080-P',
+    'Cesaroni 7388M2045-P',
+    'Cesaroni 7545M1590-P',
+    'Cesaroni 7649M1290-P',
+    'Cesaroni 8429M2020-P',
+    'Cesaroni 9994M3400-P',
+    'Cesaroni 10367N1800-P',
+    'Cesaroni 11077N2600-P',
+    'Cesaroni 12066N2200-P',
+    'Cesaroni 13766N2500-P',
+    'Cesaroni 14263N3400-P',
+    'Cesaroni 17631N3800-P',
+    'Cesaroni 20146N5800-P',
+    'Cesaroni 21062O3400-P',
+    'Cesaroni 29920O3700-P',
+    'Cesaroni 30600O5800-P',
+    'Cesaroni 37148O4900-P',
+    'Cesaroni 40960O8000-P'
+  ];
+  // Total impulse in N·s from ThrustCurve.org, used when the code doesn't include it.
+  var IMPULSE = {"1/2a62":1.1,"1/2a6":1.1,"a83":2.5,"a8":2.5,"a85":2.5,"b42":5.0,"b4":5.0,"b44":5.0,"b62":4.3,"b6":4.3,"b64":4.3,"b66":4.3,"c53":7.8,"c5":7.8,"c63":8.8,"c6":8.8,"c65":8.8,"c67":8.8,"c113":8.8,"c11":8.8,"d123":16.8,"d12":16.8,"d125":16.8,"d127":16.8,"e124":27.2,"e12":27.2,"e126":27.2,"e128":27.2,"e164":33.4,"e16":33.4,"f154":49.6,"f15":49.6,"f156":49.6,"e164w":37.7,"e167w":37.7,"e304t":33.6,"e30":33.6,"e307t":33.6,"f204w":51.8,"f20":51.8,"f207w":51.8,"f244w":47.3,"f24":47.3,"f247w":47.3,"f326t":56.9,"f32":56.9,"f396t":49.7,"f39":49.7,"f399t":49.7,"f407w":78.1,"f40":78.1,"f428t":52.9,"f42":52.9,"f528t":73.0,"f52":73.0,"f679w":61.1,"f67":61.1,"g407w":97.1,"g40":97.1,"g4010w":97.1,"g647w":118.8,"g64":118.8,"g746w":82.8,"g74":82.8,"g767g":118.0,"g76":118.0,"g777r":105.0,"g77":105.0,"g797w":108.6,"g79":108.6,"g807t":136.6,"g80":136.6,"g8010t":136.6,"g80t14a":136.6,"g80t":136.6,"h100w14a":226.8,"h100w":226.8,"h123w14a":223.6,"h123w":223.6,"h128w14a":172.9,"h128w":172.9,"h135w14a":225.8,"h135w":225.8,"h148r14a":206.0,"h148r":206.0,"h165r14a":165.0,"h165r":165.0,"h180w14a":217.7,"h180w":217.7,"h210r14a":215.4,"h210r":215.4,"h219t14a":233.0,"h219t":233.0,"h220t14a":220.0,"h220t":220.0,"h238t14a":165.5,"h238t":165.5,"h242t14a":231.7,"h242t":231.7,"h250g14a":231.0,"h250g":231.0,"h268r14a":320.0,"h268r":320.0,"h283st14a":201.0,"h283st":201.0,"h550st14a":320.0,"h550st":320.0,"i161w14a":328.7,"i161w":328.7,"i200w14a":324.5,"i200w":324.5,"i218r14a":319.6,"i218r":319.6,"i284w14a":607.3,"i284w":607.3,"i357t14a":342.0,"i357t":342.0,"i435t14a":568.9,"i435t":568.9,"i600r14a":597.3,"i600r":597.3,"1/4a33t":0.6,"1/4a3":0.6,"1/2a32t":1.1,"1/2a3":1.1,"a32t":2.2,"a3":2.2,"a34t":2.2,"a36t":2.2,"a103t":1.9,"a10":1.9,"c115":8.8,"e166":33.4,"e168":33.4,"f152":49.6,"f158":49.6,"e204w":35.0,"e20":35.0,"e207w":35.0,"e235t":35.3,"e23":35.3,"e284t":39.7,"e28":39.7,"e287t":39.7,"f444w":41.5,"f44":41.5,"f448w":41.5,"f674w":61.1,"f676w":61.1,"f506t":76.8,"f50":76.8,"f266fj":62.2,"f26":62.2,"g6410w":118.8,"g749w":82.8,"g8013t":136.6,"g787g":109.9,"g78":109.9,"h73j10a":185.6,"h73j":185.6,"h97j10a":177.3,"h97j":177.3,"h115dm14a":172.0,"h115dm":172.0,"h130w14a":210.0,"h130w":210.0,"h170m14a":319.9,"h170m":319.9,"h178dm14a":283.0,"h178dm":283.0,"h182r14a":218.0,"h182r":218.0,"h195nt14a":236.1,"h195nt":236.1,"i115w14a":412.0,"i115w":412.0,"i140w14a":336.0,"i140w":336.0,"i180w14a":326.0,"i180w":326.0,"i205w14a":345.0,"i205w":345.0,"i211w14a":441.6,"i211w":441.6,"i229t14a":407.0,"i229t":407.0,"i245g14a":351.0,"i245g":351.0,"i280dm14a":561.0,"i280dm":561.0,"i285r14a":420.0,"i285r":420.0,"i300t14a":426.5,"i300t":426.5,"i327dm14a":539.0,"i327dm":539.0,"i366r14a":539.0,"i366r":539.0,"i500t14a":620.0,"i500t":620.0,"j90w":707.0,"j135w":1069.0,"j180t":764.0,"j250w":704.0,"j275w":774.0,"j350w":700.0,"j415w":1231.7,"j420r":658.0,"j435ws":742.8,"j460t":805.5,"j500g":723.0,"j570w":973.1,"j800t":1229.1,"hpj270w":703.0,"hp":703.0,"k185w":1417.2,"k250w":2353.0,"k270w":1968.0,"k480w":2273.3,"k550w":1539.1,"k560w":2417.0,"k695r":1514.0,"k700w":2261.0,"k780r":2371.0,"k1050w":2426.4,"k1100t":1472.0,"hpk535w":1434.0,"l400w":4641.6,"l850w":3646.2,"l952w":4656.0,"l1090w":2671.0,"l1150r":3517.0,"l1256ws":3785.0,"l1390g":3949.0,"l1520t":3715.9,"l2200g":5104.0,"hpl1000w":2714.0,"m650w":5964.0,"m750w":9325.0,"m1297w":5416.6,"m1315w":6713.5,"m1419w":7755.5,"m1550r":5600.0,"m1850w":7658.6,"m1939w":10481.5,"m2400t":7716.5,"m2500t":9671.0,"n1000w":14126.0,"n3300r":14041.0,"o5500xps":21384.0,"o5500x":21384.0,"o6000w":39620.0};
+  var KITS_KEY = 'rfs-kits-v1';
+  var lastKitMatches = [];
+
+  function customKits() { try { return JSON.parse(localStorage.getItem(KITS_KEY) || '[]'); } catch (e) { return []; } }
+  function norm(s) { return (s || '').toLowerCase().replace(/["”″]/g, ' in ').replace(/[^a-z0-9]+/g, ' ').trim(); }
+  function lev(a, b) {
+    var d = []; for (var i = 0; i <= a.length; i++) { d[i] = [i]; }
+    for (var j = 1; j <= b.length; j++) d[0][j] = j;
+    for (i = 1; i <= a.length; i++) for (j = 1; j <= b.length; j++)
+      d[i][j] = Math.min(d[i-1][j] + 1, d[i][j-1] + 1, d[i-1][j-1] + (a[i-1] === b[j-1] ? 0 : 1));
+    return d[a.length][b.length];
+  }
+  function kitScore(q, name) {
+    var qt = norm(q).split(' ').filter(Boolean), nt = norm(name).split(' ');
+    if (!qt.length) return 0;
+    var tot = 0;
+    qt.forEach(function (w) {
+      var best = 0;
+      nt.forEach(function (n) {
+        var s = 0;
+        if (n === w) s = 3;
+        else if (n.indexOf(w) === 0) s = 2;
+        else if (w.length >= 4 && lev(w, n) <= 1) s = 1.6;
+        else if (w.length >= 6 && lev(w, n) <= 2) s = 1.2;
+        if (s > best) best = s;
+      });
+      tot += best;
+    });
+    return tot / qt.length;
+  }
+  function kitMatches(q) {
+    return KITS.concat(customKits())
+      .map(function (k) { return { k: k, s: kitScore(q, k.name + ' ' + (k.alias || '')) }; })
+      .filter(function (m) { return m.s >= 1.3; })
+      .sort(function (a, b) { return b.s - a.s; })
+      .slice(0, 5).map(function (m) { return m.k; });
+  }
+  function fromSI(v, dim) {
+    var imp = state.units === 'imperial';
+    var out = dim === 'len' ? (imp ? v / 0.0254 : v * 1000) : dim === 'mass' ? (imp ? v / 0.0283495 : v * 1000) : (imp ? v / 0.0254 : v * 100);
+    return round(out, DECIMALS[state.units][dim]);
+  }
+  function toSI(id, dim) {
+    var v = parseFloat($(id).value); if (isNaN(v)) return null;
+    var imp = state.units === 'imperial';
+    return dim === 'len' ? v * (imp ? 0.0254 : 0.001) : dim === 'mass' ? v * (imp ? 0.0283495 : 0.001) : v * (imp ? 0.0254 : 0.01);
+  }
+  function pickKit(k) {
+    $('kit').value = k.name; state.kitPicked = k.name;
+    $('len').value = fromSI(k.len, 'len'); $('dia').value = fromSI(k.dia, 'len'); $('wall').value = fromSI(k.wall || 0.0005, 'len');
+    $('nlen').value = fromSI(k.nlen || k.dia * 3, 'len');
+    $('dry').value = fromSI(k.dry, 'mass'); $('payload').value = '';
+    $('fins').value = k.fins || 3; $('shape').value = k.shape || 'Ogive'; $('mat').value = k.mat || 'Cardboard'; $('nmat').value = k.nmat || 'Plastic';
+    $('chute').value = fromSI(k.rec, 'chute');
+    state.recovery = k.recovery || 'parachute';
+    document.querySelectorAll('.field.bad').forEach(function (f) { f.classList.remove('bad'); });
+    render(); save();
+  }
+  function saveCustomKit() {
+    var name = $('kit').value.trim();
+    var k = { name: name, len: toSI('len', 'len'), dia: toSI('dia', 'len'), wall: toSI('wall', 'len'), nlen: toSI('nlen', 'len'), dry: toSI('dry', 'mass'),
+              fins: parseInt($('fins').value, 10) || 3, shape: $('shape').value, mat: $('mat').value, nmat: $('nmat').value === 'custom' ? 'Plastic' : $('nmat').value,
+              recovery: state.recovery, rec: toSI('chute', 'chute') || 0, custom: true, note: 'One of your saved kits.' };
+    if (!name || !k.len || !k.dia || !k.dry) return 'Fill in at least the total length, diameter and dry weight first.';
+    try {
+      var list = customKits().filter(function (c) { return norm(c.name) !== norm(name); });
+      list.push(k); localStorage.setItem(KITS_KEY, JSON.stringify(list));
+    } catch (e) { return 'This browser won\'t let the page save kits, so it will only be used for this flight.'; }
+    state.kitPicked = name; render(); save();
+    return null;
+  }
+
+  function engineCode(s) { return (s || '').toLowerCase().replace(/estes|aerotech|cesaroni|cti|quest|klima/g, '').replace(/[^a-z0-9\/]/g, ''); }
+  function renderEngine() {
+    var q = $('engine').value.trim(), hint = $('engine-hint'), box = $('engine-suggest');
+    box.textContent = ''; hint.className = 'hint';
+    if (!q) { hint.textContent = 'Type the code printed on the engine, like C6-5.'; return; }
+    var qc = engineCode(q), mo = motorFrom(q);
+    var exact = null;
+    ENGINES.forEach(function (e) { if (engineCode(e) === qc) exact = e; });
+    if (mo) {
+      hint.className = 'hint ok';
+      hint.textContent = '✓ ' + (exact ? exact : 'Read as a class ' + mo.cls + ' engine') + ' · about ' + mo.avg + ' N average thrust · ' +
+        (mo.delay != null ? mo.delay + ' s delay'
+          : mo.adj != null ? 'adjustable delay (up to ' + mo.adj + ' s), so it deploys at apogee. Enter your setting under Recovery › Deploy timing › Custom'
+          : mo.plugged ? 'plugged motor (no ejection charge), so it assumes an altimeter deploys at apogee'
+          : mo.letter >= 'J' ? 'no delay in the code, so it assumes electronics deploy at apogee'
+          : 'no delay number found, so it deploys at apogee. Enter your delay under Recovery › Deploy timing › Custom');
+    } else {
+      hint.className = 'hint bad';
+      hint.textContent = 'Couldn\'t read that engine code. It usually looks like C6-5: the class letter, average thrust, then the delay.';
+    }
+    if (exact || !qc) return;
+    var ms = ENGINES.filter(function (e) {
+      var c = engineCode(e);
+      return c.indexOf(qc) === 0 || (qc.length >= 2 && c.indexOf(qc) >= 0) || (qc.length >= 3 && lev(qc, c) <= 1);
+    }).slice(0, 6);
+    if (!ms.length) return;
+    var lab = document.createElement('span'); lab.className = 'suggest-lab'; lab.textContent = 'Did you mean:'; box.appendChild(lab);
+    ms.forEach(function (e) {
+      var b = document.createElement('button'); b.type = 'button'; b.className = 'chip'; b.textContent = e; b.setAttribute('data-engine', e); box.appendChild(b);
+    });
+  }
+
+  // returns true when the spec panels should show in kit mode
+  function renderKit() {
+    var q = $('kit').value.trim(), box = $('kit-suggest'), st = $('kit-status');
+    box.textContent = ''; st.textContent = ''; st.className = 'status';
+    if (state.kitPicked && norm(q) !== norm(state.kitPicked)) state.kitPicked = '';
+    if (state.kitPicked) {
+      var k = KITS.concat(customKits()).filter(function (x) { return norm(x.name) === norm(state.kitPicked); })[0];
+      st.className = 'status ok';
+      var line = document.createElement('div'); line.textContent = '✓ ' + state.kitPicked + ' selected. Its specs are filled in below.';
+      st.appendChild(line);
+      var notes = [];
+      if (k && !k.custom) {
+        notes.push('Length, diameter, weight and chute size are from the maker\'s site.');
+        if (!k.finsChecked) notes.push('The maker doesn\'t list a fin count, so ' + k.fins + ' fins is a guess. Fix it below if yours is different.');
+        if (k.engines) notes.push('Recommended engines: ' + k.engines + '.');
+      }
+      if (k && k.note) notes.push(k.note);
+      notes.forEach(function (t) { var n = document.createElement('div'); n.className = 'note'; n.textContent = t; st.appendChild(n); });
+      return true;
+    }
+    if (q.length < 2) { st.textContent = 'Start typing your kit\'s name, like Big Bertha or Goblin.'; return false; }
+    lastKitMatches = kitMatches(q);
+    if (lastKitMatches.length) {
+      var lab = document.createElement('span'); lab.className = 'suggest-lab'; lab.textContent = 'Did you mean:'; box.appendChild(lab);
+      lastKitMatches.forEach(function (k, i) {
+        var b = document.createElement('button'); b.type = 'button'; b.className = 'chip'; b.setAttribute('data-kit', i);
+        b.textContent = k.name;
+        if (k.custom) { var s = document.createElement('span'); s.className = 'sub'; s.textContent = 'your kit'; b.appendChild(s); }
+        box.appendChild(b);
+      });
+      st.textContent = 'Pick your kit from the list to fill in its specs.';
+      return false;
+    }
+    var msg = document.createElement('div');
+    msg.textContent = 'No kits match "' + q + '" yet. Enter its specs below, then save it so it shows up next time.';
+    st.appendChild(msg);
+    var sb = document.createElement('button'); sb.type = 'button'; sb.className = 'ghost'; sb.id = 'save-kit'; sb.textContent = 'Save as kit';
+    st.appendChild(sb);
+    var err = document.createElement('div'); err.className = 'err'; err.id = 'save-kit-err'; err.hidden = true; st.appendChild(err);
+    return true;
+  }
+
+  document.addEventListener('click', function (e) {
+    var t = e.target.closest && e.target.closest('button');
+    if (!t) return;
+    if (t.hasAttribute('data-engine')) { $('engine').value = t.getAttribute('data-engine'); render(); save(); $('engine').focus(); }
+    else if (t.hasAttribute('data-kit')) { var k = lastKitMatches[+t.getAttribute('data-kit')]; if (k) pickKit(k); }
+    else if (t.id === 'save-kit') {
+      var problem = saveCustomKit();
+      if (problem) { var er = $('save-kit-err'); if (er) { er.textContent = problem; er.hidden = false; } }
+    }
+  });
+
+  var UNITS = {
+    metric:   { len: 'mm', mass: 'g',  chute: 'cm', rod: 'm',  wind: 'km/h' },
+    imperial: { len: 'in', mass: 'oz', chute: 'in', rod: 'ft', wind: 'mph' }
+  };
+  // metric value = imperial value * factor
+  var FACTOR = { len: 25.4, mass: 28.3495, chute: 2.54, rod: 0.3048, wind: 1.609344 };
+  var DECIMALS = { metric: { len: 1, mass: 1, chute: 1, rod: 2, wind: 1 }, imperial: { len: 2, mass: 2, chute: 1, rod: 1, wind: 1 } };
+
+  var FIELD_IDS = ['engine','kit','len','dia','wall','mat','fins','shape','nlen','nmat','nmass','dry','payload','chute','delay','rod','angle','wind'];
+
+  function round(v, d) { var p = Math.pow(10, d); return String(Math.round(v * p) / p); }
+
+  function engineClass() {
+    var mo = motorFrom($('engine').value);
+    return mo ? mo.cls : null;
+  }
+  function engineDelay() {
+    var m = ($('engine').value || '').match(/-(\d+(\.\d+)?)\s*$/);
+    return m ? m[1] : null;
+  }
+  function rodDefault() {
+    var c = engineClass(); var L = c ? c.slice(-1) : null;
+    if (L && L >= 'K') return { m: 3.7, ft: 12, kind: '1515 rail' };
+    if (L && L >= 'H') return { m: 2.4, ft: 8, kind: '1010 rail' };
+    if (L && L >= 'E') return { m: 1.8, ft: 6, kind: '1/4" rod' };
+    return { m: 0.9, ft: 3, kind: '1/8" rod' };
+  }
+
+  function render() {
+    document.querySelectorAll('.seg').forEach(function (seg) {
+      var g = seg.getAttribute('data-group');
+      seg.querySelectorAll('button').forEach(function (b) {
+        b.setAttribute('aria-pressed', String(b.getAttribute('data-value') === state[g]));
+      });
+    });
+    var u = UNITS[state.units];
+    document.querySelectorAll('[data-unit]').forEach(function (el) { el.textContent = u[el.getAttribute('data-unit')]; });
+
+    $('kit-panel').hidden = state.kit !== 'yes';
+    var showSpecs = state.kit === 'yes' ? renderKit() : true;
+    $('manual-panels').hidden = !showSpecs;
+    renderEngine();
+    $('nmass-group').hidden = $('nmat').value !== 'custom';
+    $('chute-lab').textContent = state.recovery === 'parachute' ? 'Parachute diameter' : 'Streamer width';
+    $('delay-group').hidden = state.deploy !== 'custom';
+    $('deploy-hint').hidden = state.deploy !== 'engine';
+
+    var metric = state.units === 'metric';
+    var rod = rodDefault(); var cls = engineClass();
+    var rodVal = metric ? rod.m : rod.ft;
+    $('rod-tag').textContent = 'AUTO ' + rodVal + ' ' + u.rod;
+    $('rod').placeholder = rodVal;
+    $('rod-note').textContent = cls
+      ? 'Set for ' + cls + ' engines: a standard ' + rod.kind + '.'
+      : 'Changes with your engine: 3 ft for A–D, 6 ft for E–G, 8 ft rail for H–J, 12 ft rail for K and up.';
+    var wind = metric ? 8 : 5;
+    $('wind-tag').textContent = 'AUTO ' + wind + ' ' + u.wind;
+    $('wind').placeholder = wind;
+    if (flight && !$('results-view').hidden) drawFlightCharts(anim.done ? null : anim.t);
+
+  }
+
+  function convertUnits(to) {
+    if (to === state.units) return;
+    document.querySelectorAll('input[data-dim]').forEach(function (inp) {
+      if (inp.value === '') return;
+      var dim = inp.getAttribute('data-dim'); var v = parseFloat(inp.value);
+      if (isNaN(v)) return;
+      var out = to === 'imperial' ? v / FACTOR[dim] : v * FACTOR[dim];
+      inp.value = round(out, DECIMALS[to][dim]);
+    });
+    state.units = to;
+  }
+
+  function save() {
+    try {
+      var data = { state: state, fields: {} };
+      FIELD_IDS.forEach(function (id) { data.fields[id] = $(id).value; });
+      localStorage.setItem(KEY, JSON.stringify(data));
+    } catch (e) {}
+  }
+  function load() {
+    try {
+      var raw = localStorage.getItem(KEY); if (!raw) return;
+      var data = JSON.parse(raw);
+      if (data.state) Object.keys(state).forEach(function (k) { if (data.state[k]) state[k] = data.state[k]; });
+      if (data.fields) FIELD_IDS.forEach(function (id) { if (data.fields[id] != null) $(id).value = data.fields[id]; });
+    } catch (e) {}
+  }
+
+  document.querySelectorAll('.seg').forEach(function (seg) {
+    seg.addEventListener('click', function (e) {
+      var b = e.target.closest('button'); if (!b) return;
+      var g = seg.getAttribute('data-group'); var v = b.getAttribute('data-value');
+      if (g === 'units') convertUnits(v); else state[g] = v;
+      render(); save();
+    });
+  });
+  document.addEventListener('input', function (e) {
+    if (e.target.closest && e.target.closest('.field')) e.target.closest('.field').classList.remove('bad');
+    render(); save();
+  });
+  // Text boxes already re-render on every keystroke; re-rendering again when they lose focus
+  // would rebuild the suggestion chips under the mouse and swallow the click.
+  document.addEventListener('change', function (e) {
+    var t = e.target;
+    if (t && (t.tagName === 'TEXTAREA' || (t.tagName === 'INPUT' && t.type === 'text'))) return;
+    render(); save();
+  });
+
+  $('load-example').addEventListener('click', function () {
+    var metric = state.units === 'metric';
+    var ex = metric
+      ? { len: 330, dia: 24.8, wall: 0.5, nlen: 75, dry: 35, payload: 0, chute: 30 }
+      : { len: 13, dia: 0.98, wall: 0.02, nlen: 3, dry: 1.23, payload: 0, chute: 12 };
+    state.kit = 'no'; state.recovery = 'parachute'; state.deploy = 'engine';
+    $('engine').value = 'Estes C6-5';
+    $('mat').value = 'Cardboard'; $('fins').value = 3; $('shape').value = 'Ogive'; $('nmat').value = 'Plastic';
+    Object.keys(ex).forEach(function (k) { $(k).value = ex[k]; });
+    ['rod','angle','wind','delay','nmass'].forEach(function (k) { $(k).value = ''; });
+    document.querySelectorAll('.field.bad').forEach(function (f) { f.classList.remove('bad'); });
+    $('launch-err').hidden = true;
+    render(); save();
+  });
+  $('clear-all').addEventListener('click', function () {
+    FIELD_IDS.forEach(function (id) { var el = $(id); if (el.tagName === 'SELECT') el.selectedIndex = 0; else el.value = ''; });
+    state.kit = 'no'; state.recovery = 'parachute'; state.deploy = 'engine'; state.kitPicked = '';
+    $('launch-err').hidden = true;
+    render(); save();
+  });
+
+  function val(id) { return $(id).value.trim(); }
+
+  $('launch').addEventListener('click', function () {
+    document.querySelectorAll('.field.bad').forEach(function (f) { f.classList.remove('bad'); });
+    if (state.kit === 'yes' && $('manual-panels').hidden) {
+      $('kit-field').classList.add('bad');
+      $('launch-err').textContent = val('kit') ? 'Pick your kit from the "Did you mean" list first.' : 'Search for your kit first, or choose No to enter specs yourself.';
+      $('launch-err').hidden = false; $('kit').focus();
+      return;
+    }
+    var need = [['engine', 'engine'], ['len', 'total length'], ['dia', 'body diameter'], ['dry', 'dry weight']];
+    var missing = [];
+    need.forEach(function (n) {
+      if (!val(n[0])) { missing.push(n[1]); $(n[0]).closest('.field').classList.add('bad'); }
+    });
+    if (missing.length) {
+      $('launch-err').textContent = 'Add the ' + missing.join(', ') + ' to launch.';
+      $('launch-err').hidden = false;
+      $(need.filter(function (n) { return !val(n[0]); })[0][0]).focus();
+      return;
+    }
+    if (!motorFrom(val('engine'))) {
+      $('engine-field').classList.add('bad');
+      $('launch-err').textContent = 'Couldn\'t read that engine code. Pick one from the "Did you mean" list, or type it like C6-5.';
+      $('launch-err').hidden = false; $('engine').focus();
+      return;
+    }
+    $('launch-err').hidden = true;
+    showResults();
+  });
+
+  function showResults() {
+    var u = UNITS[state.units]; var metric = state.units === 'metric';
+    var rod = rodDefault();
+    function withUnit(id, unit, auto) { var v = val(id); return v ? v + ' ' + unit : (auto != null ? auto + ' ' + unit + ' (auto)' : '—'); }
+    var rows = [['Engine', val('engine')]];
+    if (state.kit === 'yes') rows.push(['Kit', state.kitPicked || val('kit') + ' (custom specs)']);
+    {
+      rows.push(['Length', withUnit('len', u.len)], ['Diameter', withUnit('dia', u.len)], ['Wall', withUnit('wall', u.len)],
+        ['Body material', val('mat')], ['Fins', val('fins') || '—'], ['Nose', val('shape') + ', ' + withUnit('nlen', u.len)],
+        ['Nose material', $('nmat').value === 'custom' ? withUnit('nmass', u.mass) : val('nmat')],
+        ['Dry weight', withUnit('dry', u.mass)], ['Payload', withUnit('payload', u.mass)],
+        ['Recovery', (state.recovery === 'parachute' ? 'Parachute ' : 'Streamer ') + withUnit('chute', u.chute)],
+        ['Deploy', state.deploy === 'engine'
+          ? ((motorFrom(val('engine')) || {}).delay != null ? 'Engine delay (' + motorFrom(val('engine')).delay + ' s)' : 'At apogee')
+          : withUnit('delay', 's')]);
+    }
+    rows.push(['Rod length', withUnit('rod', u.rod, metric ? rod.m : rod.ft)], ['Launch angle', withUnit('angle', '°', 5)], ['Wind', withUnit('wind', u.wind, metric ? 8 : 5)]);
+    var dl = $('summary'); dl.textContent = '';
+    rows.forEach(function (r) {
+      var d = document.createElement('div'); var dt = document.createElement('dt'); var dd = document.createElement('dd');
+      dt.textContent = r[0]; dd.textContent = r[1]; d.appendChild(dt); d.appendChild(dd); dl.appendChild(d);
+    });
+    $('results-title').textContent = val('engine') + ' flight';
+    $('setup-view').hidden = true; $('results-view').hidden = false;
+    window.scrollTo(0, 0);
+    runFlight();
+  }
+  $('back').addEventListener('click', function () {
+    stopAnim();
+    $('results-view').hidden = true; $('setup-view').hidden = false; window.scrollTo(0, 0);
+  });
+
+  /* ---------- Physics ---------- */
+  var G = 9.81, RHO = 1.225, STEP = 0.02;
+  var IMAX = { '1/8A': 0.3125, '1/4A': 0.625, '1/2A': 1.25, A: 2.5, B: 5, C: 10, D: 20, E: 40, F: 80, G: 160, H: 320, I: 640, J: 1280, K: 2560, L: 5120, M: 10240, N: 20480, O: 40960 };
+
+  function motorFrom(code) {
+    var s = (code || '').toUpperCase();
+    var m = s.match(/(?:^|[^A-Z0-9\/])(\d+)?(1\/[248]A|[A-O])\s?(\d+(?:\.\d+)?)/);
+    if (!m) return null;
+    var cls = m[2], letter = cls.slice(-1), avg = parseFloat(m[3]);
+    if (!(avg > 0)) return null;
+    // Codes like 163H133 start with the real total impulse (N·s); use it when it fits the class.
+    var total = m[1] ? parseFloat(m[1]) : null;
+    if (!(total && total <= IMAX[cls] && total > IMAX[cls] / 2)) total = null;
+    var known = (typeof IMPULSE !== 'undefined') ? (IMPULSE[engineCode(code)] || IMPULSE[engineCode(code.replace(/-.*$/, ''))]) : null;
+    if (!total && known) total = known;
+    var I = total || IMAX[cls] * 0.88;
+    var burn = I / avg, bp = letter <= 'E';
+    var pts = bp ? [[0,0],[0.05,2.6],[0.13,1.9],[0.22,0.8],[0.9,0.62],[1,0]]
+                 : [[0,0],[0.04,1.3],[0.3,1.15],[0.8,1.0],[0.95,0.55],[1,0]];
+    var area = 0;
+    for (var i = 1; i < pts.length; i++) area += (pts[i][0] - pts[i-1][0]) * (pts[i][1] + pts[i-1][1]) / 2;
+    var rest = s.slice(m.index + m[0].length);
+    var dm = rest.match(/^\s*[A-Z]*\s*-\s*(\d+(?:\.\d+)?)(A)?/);
+    var adj = dm && dm[2] ? parseFloat(dm[1]) : null;
+    var plugged = /^\s*[A-Z]*\s*-\s*P/.test(rest);
+    if (adj != null) dm = null;
+    return {
+      cls: cls, letter: letter, avg: avg, I: I, burn: burn,
+      propM: I / ((bp ? 80 : 180) * G),
+      caseM: letter <= 'C' ? 0.012 : letter <= 'E' ? 0.023 : letter <= 'G' ? 0.045 : letter === 'H' ? 0.12 : Math.max(0.35, 0.8 * I / (180 * G)),
+      exactI: I === total,
+      delay: dm ? parseFloat(dm[1]) : null, adj: adj, plugged: plugged,
+      thrust: function (t) {
+        if (t < 0 || t >= burn) return 0;
+        var tau = t / burn;
+        for (var j = 1; j < pts.length; j++) {
+          if (tau <= pts[j][0]) {
+            var a = pts[j-1], b = pts[j];
+            return (a[1] + (b[1] - a[1]) * (tau - a[0]) / (b[0] - a[0])) * avg / area;
+          }
+        }
+        return 0;
+      }
+    };
+  }
+
+  function getRocket() {
+    var imp = state.units === 'imperial', kit = false;
+    function num(id) { var v = parseFloat($(id).value); return isNaN(v) ? null : v; }
+    var L = imp ? 0.0254 : 0.001, M = imp ? 0.0283495 : 0.001, C = imp ? 0.0254 : 0.01, R = imp ? 0.3048 : 1, W = imp ? 0.44704 : 1 / 3.6;
+    var rd = rodDefault();
+    return {
+      kit: kit,
+      len: kit ? 0.33 : num('len') * L,
+      dia: kit ? 0.0248 : num('dia') * L,
+      dry: kit ? 0.035 : num('dry') * M,
+      payload: kit ? 0 : (num('payload') || 0) * M,
+      fins: kit ? 3 : (num('fins') || 3),
+      shape: kit ? 'Ogive' : $('shape').value,
+      recovery: kit ? 'parachute' : state.recovery,
+      rec: kit ? 0.30 : (num('chute') || 0) * C,
+      customDelay: (!kit && state.deploy === 'custom') ? num('delay') : null,
+      rod: num('rod') != null ? num('rod') * R : (imp ? rd.ft * 0.3048 : rd.m),
+      angle: num('angle') != null ? num('angle') : 5,
+      wind: num('wind') != null ? num('wind') * W : (imp ? 5 * 0.44704 : 8 / 3.6)
+    };
+  }
+
+  function simulate(r, mo) {
+    var area = Math.PI * r.dia * r.dia / 4;
+    var cdBody = ({ Ogive: 0.45, Conical: 0.5, Elliptical: 0.45, Parabolic: 0.43 }[r.shape] || 0.45) + 0.05 * r.fins;
+    // No fixed delay (adjustable, plugged, or unreadable): deploy at apogee, as a correctly set delay or an altimeter would.
+    var delay = r.customDelay != null ? r.customDelay : mo.delay;
+    var tEject = delay != null ? mo.burn + delay : null;
+    var recCdA = r.rec > 0 ? (r.recovery === 'parachute' ? 0.8 * Math.PI * r.rec * r.rec / 4 : 0.3 * r.rec * 10 * r.rec) : 0;
+    var th = r.angle * Math.PI / 180, ux = -Math.sin(th), uy = Math.cos(th);
+    var base = r.dry + r.payload + mo.caseM;
+    var x = 0, y = 0, vx = 0, vy = 0, t = 0, dt = 0.002, J = 0, k = 0;
+    var onRod = true, lifted = false, deployed = false, hx = ux, hy = uy;
+    var f = { path: [], apo: 0, tApo: 0, vMax: 0, tVmax: 0, aMax: 0, tAmax: 0, vRod: null, tRod: null,
+              depH: null, depV: null, tDep: null, minX: 0, maxX: 0, noLift: false, crashed: false,
+              liftMass: base + mo.propM, tEject: tEject, delay: delay, ux: ux, uy: uy };
+    while (t < 900) {
+      var T = mo.thrust(t);
+      var mass = base + mo.propM * Math.max(0, 1 - J / mo.I);
+      var rvx = vx - r.wind, rv = Math.hypot(rvx, vy);
+      if (!onRod && !deployed && rv > 0.5) { hx = rvx / rv; hy = vy / rv; }
+      var D = 0.5 * RHO * (cdBody * area + (deployed ? recCdA : 0)) * rv * rv;
+      var dX = rv > 0 ? -D * rvx / rv : 0, dY = rv > 0 ? -D * vy / rv : 0;
+      var ax, ay;
+      if (onRod) {
+        var a = (T - mass * G * uy + dX * ux + dY * uy) / mass;
+        if (!lifted && a <= 0) a = 0; else lifted = true;
+        var sp = Math.max(0, vx * ux + vy * uy + a * dt);
+        vx = sp * ux; vy = sp * uy; ax = a * ux; ay = a * uy;
+        x += vx * dt; y += vy * dt;
+        if (Math.hypot(x, y) >= r.rod) { onRod = false; f.vRod = sp; f.tRod = t; }
+        if (!lifted && t > mo.burn) { f.noLift = true; break; }
+      } else {
+        ax = (T * hx + dX) / mass; ay = (T * hy + dY) / mass - G;
+        vx += ax * dt; vy += ay * dt; x += vx * dt; y += vy * dt;
+      }
+      J += T * dt;
+      var speed = Math.hypot(vx, vy);
+      if (lifted && !deployed) {
+        var am = Math.hypot(ax, ay);
+        if (am > f.aMax) { f.aMax = am; f.tAmax = t; }
+        if (speed > f.vMax) { f.vMax = speed; f.tVmax = t; }
+      }
+      if (y > f.apo) { f.apo = y; f.tApo = t; }
+      if (!deployed && lifted && (tEject != null ? t >= tEject : (t > mo.burn && vy <= 0))) { deployed = true; f.tDep = t; f.depH = y; f.depV = speed; }
+      if (x < f.minX) f.minX = x; if (x > f.maxX) f.maxX = x;
+      if (t >= k * STEP - 1e-9) {
+        f.path.push({ t: t, x: x, y: Math.max(0, y), v: speed, hx: hx, hy: hy, phase: T > 0 ? 'burn' : deployed ? 'rec' : 'coast' });
+        k++;
+      }
+      t += dt;
+      if (lifted && !onRod && y <= 0) { y = 0; f.vLand = Math.abs(vy); f.landX = x; break; }
+    }
+    if (!deployed && !f.noLift) f.crashed = true;
+    f.tEnd = t;
+    f.path.push({ t: t, x: x, y: 0, v: 0, hx: hx, hy: hy, phase: deployed ? 'landed' : 'crashed' });
+    return f;
+  }
+
+  /* ---------- Formatting ---------- */
+  function fmt(v, kind) {
+    var imp = state.units === 'imperial';
+    if (v == null || isNaN(v)) return '—';
+    if (kind === 'len') return imp ? Math.round(v / 0.3048).toLocaleString() + ' ft' : Math.round(v).toLocaleString() + ' m';
+    if (kind === 'spd') return imp ? Math.round(v / 0.44704) + ' mph' : (v < 20 ? v.toFixed(1) : Math.round(v)) + ' m/s';
+    if (kind === 'acc') return (v / G).toFixed(1) + ' g';
+    return String(v);
+  }
+
+  function concerns(r, mo, f) {
+    var c = [];
+    var imp = state.units === 'imperial';
+    if (f.noLift) {
+      c.push(['warn', 'The ' + mo.cls + ' engine can\'t lift this rocket. Its average thrust is less than the rocket\'s weight. Use a stronger engine or lighten the rocket.']);
+      return c;
+    }
+    var twr = mo.avg / (f.liftMass * G);
+    if (twr < 5) c.push(['warn', 'Thrust-to-weight is ' + twr.toFixed(1) + ':1. Aim for at least 5:1 so it leaves the rod fast and flies straight.']);
+    if (f.vRod != null && f.vRod < 13.7) c.push(['warn', 'Leaves the rod at ' + fmt(f.vRod, 'spd') + '. Below about 45 ft/s (14 m/s) the fins can\'t steer yet, so wind can tip it. Try a longer rod or a stronger engine.']);
+    if (!r.kit) {
+      var ld = r.len / r.dia;
+      if (r.fins < 3) c.push(['warn', 'With fewer than 3 fins the rocket can\'t be stable.']);
+      if (ld < 8) c.push(['warn', 'Short and wide (length is ' + ld.toFixed(1) + '× the diameter). It may be unstable without bigger fins or nose weight.']);
+      if (ld > 25) c.push(['warn', 'Very long and thin (' + ld.toFixed(0) + '× the diameter). It may bend or flutter at high speed.']);
+      if (r.rec <= 0) c.push(['warn', 'No ' + r.recovery + ' size entered, so it falls with no recovery.']);
+    }
+    if (f.crashed) {
+      c.push(['warn', 'It hits the ground before the ejection charge fires. Use a shorter delay. About ' + Math.max(0, Math.round(f.tApo - mo.burn)) + ' s would deploy near apogee.']);
+    } else if (f.depV != null && f.depV > 15) {
+      var when = f.tDep < f.tApo ? 'before' : 'after';
+      c.push(['warn', 'Deploys at ' + fmt(f.depV, 'spd') + ', ' + Math.abs(f.tDep - f.tApo).toFixed(1) + ' s ' + when + ' apogee. That can tear the chute or shock cord. A delay of about ' + Math.max(0, Math.round(f.tApo - mo.burn)) + ' s would deploy near apogee.']);
+    }
+    var hardV = (r.dry + r.payload) < 0.1 ? 10 : 6.1; // tiny light rockets shrug off faster landings
+    if (!f.crashed && f.vLand > hardV && r.rec > 0) c.push(['warn', 'Lands at ' + fmt(f.vLand, 'spd') + '. That\'s fast enough to crack fins. Use a bigger ' + r.recovery + '.']);
+    if (f.crashed || r.rec <= 0) c.push(['warn', 'Hits the ground at ' + fmt(f.vLand, 'spd') + ' with no recovery out.']);
+    if (Math.abs(f.landX) > 200) c.push(['warn', 'Drifts ' + fmt(Math.abs(f.landX), 'len') + '. Make sure your field is big enough, or use a smaller chute or a streamer.']);
+    if (r.wind > 8.94) c.push(['warn', 'Wind is over 20 mph. The safety code says not to launch.']);
+    if (r.angle > 30) c.push(['warn', 'A launch angle over 30° breaks the safety code.']);
+    if (state.kit === 'yes' && state.kitPicked) c.push(['info', 'Flown with typical specs for the ' + state.kitPicked + '. Weigh your finished rocket for a more accurate result.']);
+    if (!c.filter(function (x) { return x[0] === 'warn'; }).length) c.unshift(['ok', 'No concerns. Looks like a good flight.']);
+    return c;
+  }
+
+  /* ---------- Animation ---------- */
+  var flight = null, rocketIn = null, motorIn = null, anim = { raf: 0, start: 0, aDur: 0, dDur: 0, tA: 0, done: false, t: 0 };
+  var canvas = $('sky'), ctx = canvas.getContext('2d');
+  var reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  function stopAnim() { if (anim.raf) cancelAnimationFrame(anim.raf); anim.raf = 0; }
+
+  function runFlight() {
+    stopAnim();
+    rocketIn = getRocket();
+    motorIn = motorFrom(val('engine'));
+    var list = $('concerns');
+    if (!motorIn) {
+      flight = null;
+      list.innerHTML = '';
+      var li = document.createElement('li'); li.className = 'warn';
+      li.textContent = 'Couldn\'t read the engine code. Use the format on the engine, like C6-5 or F15-4.';
+      list.appendChild(li);
+      setStats(0); draw(0); drawThrust(); drawFlightCharts(null); return;
+    }
+    flight = simulate(rocketIn, motorIn);
+    hoverT = null; drawThrust(); drawFlightCharts(null);
+    anim.tA = Math.min(flight.tEnd, flight.tApo + 0.4);
+    anim.aDur = Math.max(2.5, Math.min(8, anim.tA));
+    anim.dDur = flight.tEnd > anim.tA ? 4.5 : 0;
+    anim.done = false;
+    list.innerHTML = '<li class="pending">Shown after landing.</li>';
+    if (reduceMotion || flight.noLift) { finish(); return; }
+    anim.start = null;
+    anim.raf = requestAnimationFrame(function (now) { anim.start = now; frame(now); });
+  }
+
+  function frame(now) {
+    var e = Math.max(0, (now - anim.start) / 1000), t;
+    if (e <= anim.aDur) t = e / anim.aDur * anim.tA;
+    else t = anim.tA + Math.min(1, anim.dDur ? (e - anim.aDur) / anim.dDur : 1) * (flight.tEnd - anim.tA);
+    anim.t = t;
+    setStats(t); draw(t); drawFlightCharts(t);
+    if (e >= anim.aDur + anim.dDur) { finish(); return; }
+    anim.raf = requestAnimationFrame(frame);
+  }
+
+  function finish() {
+    stopAnim();
+    anim.done = true;
+    anim.t = flight ? flight.tEnd : 0;
+    setStats(anim.t); draw(anim.t); drawFlightCharts(null);
+    if (!flight) return;
+    var list = $('concerns'); list.innerHTML = '';
+    concerns(rocketIn, motorIn, flight).forEach(function (c) {
+      var li = document.createElement('li'); li.className = c[0]; li.textContent = c[1]; list.appendChild(li);
+    });
+  }
+
+  function setStats(t) {
+    var f = flight;
+    function put(id, show, text) { var el = $(id); el.textContent = show ? text : '—'; el.classList.toggle('pending', !show); }
+    if (!f) { ['s-apo','s-vmax','s-amax','s-rod','s-dh','s-dv','s-drift'].forEach(function (id) { put(id, false); }); return; }
+    var end = anim.done;
+    put('s-apo', end || t >= f.tApo, fmt(f.apo, 'len'));
+    put('s-vmax', !f.noLift && (end || t >= f.tVmax), fmt(f.vMax, 'spd'));
+    put('s-amax', !f.noLift && (end || t >= f.tAmax), fmt(f.aMax, 'acc'));
+    put('s-rod', f.vRod != null && (end || t >= f.tRod), fmt(f.vRod, 'spd'));
+    put('s-dh', f.tDep != null && (end || t >= f.tDep), fmt(f.depH, 'len'));
+    put('s-dv', f.tDep != null && (end || t >= f.tDep), fmt(f.depV, 'spd'));
+    put('s-drift', !f.noLift && end, fmt(Math.abs(f.landX || 0), 'len'));
+    if (f.tDep == null && end && !f.noLift) { $('s-dh').textContent = 'Never'; $('s-dv').textContent = 'Never'; $('s-dh').classList.remove('pending'); $('s-dv').classList.remove('pending'); }
+  }
+
+  function niceStep(range, n) {
+    var raw = range / n, p = Math.pow(10, Math.floor(Math.log10(raw))), q = raw / p;
+    return (q < 1.5 ? 1 : q < 3 ? 2 : q < 7 ? 5 : 10) * p;
+  }
+  function css(name) { return getComputedStyle(document.documentElement).getPropertyValue(name).trim(); }
+
+  function draw(t) {
+    var dpr = window.devicePixelRatio || 1;
+    var W = canvas.clientWidth, H = canvas.clientHeight;
+    if (!W || !H) return;
+    if (canvas.width !== Math.round(W * dpr) || canvas.height !== Math.round(H * dpr)) { canvas.width = Math.round(W * dpr); canvas.height = Math.round(H * dpr); }
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, W, H);
+    var C = { fg: css('--fg'), soft: css('--soft'), muted: css('--muted'), line: css('--line'), accent: css('--accent'), accentSoft: css('--accent-soft'), apogee: css('--apogee'), sky: css('--sky'), flame: css('--flame') };
+    ctx.fillStyle = C.sky; ctx.fillRect(0, 0, W, H);
+
+    var imp = state.units === 'imperial', uf = imp ? 0.3048 : 1, uname = imp ? 'ft' : 'm';
+    var axisL = 64, bottom = 46, top = 28, right = 28;
+    var dataL = W > 760 ? 380 : axisL + 28;
+    var f = flight;
+    var apo = f ? Math.max(f.apo, 1) : 10;
+    var yMaxU = niceStep(apo / uf * 1.15, 5); yMaxU = Math.ceil(apo / uf * 1.15 / yMaxU) * yMaxU;
+    var yMax = yMaxU * uf;
+    var minX = f ? Math.min(0, f.minX) : 0, maxX = f ? Math.max(0, f.maxX) : 0;
+    var span = Math.max(maxX - minX, apo * 0.4, 5), extra = (span - (maxX - minX)) / 2;
+    var x0 = minX - extra - span * 0.08, x1 = maxX + extra + span * 0.08;
+    var sx = function (x) { return dataL + (x - x0) / (x1 - x0) * (W - right - dataL); };
+    var sy = function (y) { return H - bottom - y / yMax * (H - bottom - top); };
+    var groundY = sy(0);
+
+    // grid + height labels
+    ctx.font = '12px ' + css('--mono'); ctx.textBaseline = 'middle';
+    var ys = niceStep(yMaxU, 5);
+    for (var v = 0; v <= yMaxU + 1e-9; v += ys) {
+      var Y = sy(v * uf);
+      ctx.strokeStyle = C.line; ctx.globalAlpha = v === 0 ? 0 : 0.6; ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(axisL, Y); ctx.lineTo(W - right, Y); ctx.stroke(); ctx.globalAlpha = 1;
+      ctx.fillStyle = C.muted; ctx.textAlign = 'right'; ctx.fillText(Math.round(v).toLocaleString(), axisL - 8, Y);
+    }
+    // distance labels
+    var xsU = niceStep((x1 - x0) / uf, W > 760 ? 6 : 4);
+    ctx.textAlign = 'center'; ctx.textBaseline = 'top';
+    for (var xv = Math.ceil(x0 / uf / xsU) * xsU; xv <= x1 / uf; xv += xsU) {
+      var X = sx(xv * uf);
+      ctx.fillStyle = C.muted; ctx.fillText(Math.round(xv).toLocaleString(), X, groundY + 8);
+      ctx.strokeStyle = C.soft; ctx.beginPath(); ctx.moveTo(X, groundY); ctx.lineTo(X, groundY + 4); ctx.stroke();
+    }
+    // axes
+    ctx.strokeStyle = C.soft; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(axisL, top - 8); ctx.lineTo(axisL, groundY); ctx.lineTo(W - right + 10, groundY); ctx.stroke();
+    ctx.save(); ctx.translate(20, (top + groundY) / 2); ctx.rotate(-Math.PI / 2);
+    ctx.fillStyle = C.muted; ctx.font = '13px ' + css('--sans'); ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText('Height (' + uname + ')', 0, 0); ctx.restore();
+    ctx.fillStyle = C.muted; ctx.font = '13px ' + css('--sans'); ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic';
+    ctx.fillText('Distance from pad (' + uname + ')', (dataL + W - right) / 2, H - 8);
+
+    // launch pad + rod
+    var px = sx(0);
+    var ux = f ? f.ux : 0, uy = f ? f.uy : 1;
+    ctx.strokeStyle = C.soft; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(px, groundY); ctx.lineTo(px + ux * 40, groundY - uy * 40); ctx.stroke();
+    ctx.fillStyle = C.soft;
+    ctx.beginPath(); ctx.moveTo(px - 14, groundY); ctx.lineTo(px, groundY - 8); ctx.lineTo(px + 14, groundY); ctx.closePath(); ctx.fill();
+
+    if (!f) { drawRocket(px + ux * 22, groundY - uy * 22, Math.atan2(ux, uy), false, C); return; }
+
+    // apogee line
+    if (t >= f.tApo || anim.done) {
+      var ay = sy(f.apo);
+      ctx.strokeStyle = C.apogee; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.moveTo(axisL, ay); ctx.lineTo(W - right, ay); ctx.stroke();
+      ctx.fillStyle = C.apogee; ctx.beginPath(); ctx.arc(axisL, ay, 5, 0, Math.PI * 2); ctx.fill();
+      ctx.font = '600 13px ' + css('--mono'); ctx.textAlign = 'right'; ctx.textBaseline = 'bottom';
+      ctx.fillText('APOGEE ' + fmt(f.apo, 'len'), W - right, ay - 6);
+    }
+
+    // trail
+    var idx = Math.max(0, Math.min(f.path.length - 1, Math.floor(t / STEP)));
+    if (anim.done) idx = f.path.length - 1;
+    ctx.strokeStyle = C.soft; ctx.globalAlpha = 0.7; ctx.lineWidth = 2; ctx.setLineDash([6, 8]);
+    ctx.beginPath();
+    for (var i = 0; i <= idx; i++) { var p = f.path[i]; if (i === 0) ctx.moveTo(sx(p.x), sy(p.y)); else ctx.lineTo(sx(p.x), sy(p.y)); }
+    ctx.stroke(); ctx.setLineDash([]); ctx.globalAlpha = 1;
+
+    // rocket
+    var cur = f.path[idx];
+    var cx = sx(cur.x), cy = sy(cur.y);
+    var scX = (W - right - dataL) / (x1 - x0), scY = (H - bottom - top) / yMax;
+    var rot = Math.atan2(cur.hx * scX, cur.hy * scY);
+    if (cur.phase === 'rec' || cur.phase === 'landed') {
+      if (cur.phase === 'landed') cy = Math.min(cy, groundY - 20);
+      drawRecovery(cx, cy, rocketIn.recovery, rocketIn.rec > 0, t, C);
+    } else if (cur.phase === 'crashed') {
+      ctx.fillStyle = C.apogee; ctx.font = '600 13px ' + css('--mono'); ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
+      ctx.fillText('IMPACT', cx, groundY - 8);
+      drawRocket(cx, groundY - 14, Math.PI * 0.6, false, C);
+    } else {
+      if (idx === 0 && !f.vRod) { cx = px + ux * 22; cy = groundY - uy * 22; }
+      drawRocket(cx, cy, rot, cur.phase === 'burn', C);
+    }
+    if (anim.done && !f.noLift) {
+      var lx = sx(f.landX);
+      ctx.strokeStyle = C.accent; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.moveTo(lx - 6, groundY - 6); ctx.lineTo(lx + 6, groundY + 6); ctx.moveTo(lx + 6, groundY - 6); ctx.lineTo(lx - 6, groundY + 6); ctx.stroke();
+    }
+
+    // HUD
+    ctx.font = '600 13px ' + css('--mono'); ctx.textAlign = 'right'; ctx.textBaseline = 'top'; ctx.fillStyle = C.soft;
+    var phaseName = { burn: 'POWERED', coast: 'COASTING', rec: 'RECOVERY', landed: 'LANDED', crashed: 'IMPACT' }[cur.phase] || '';
+    if (f.noLift) phaseName = 'NO LIFTOFF';
+    ctx.fillText('T+ ' + (anim.done ? f.tEnd : t).toFixed(1) + ' s   ALT ' + fmt(cur.y, 'len') + '   ' + phaseName, W - right, 12);
+  }
+
+  function drawRocket(x, y, rot, flame, C) {
+    ctx.save(); ctx.translate(x, y); ctx.rotate(rot);
+    if (flame) {
+      var fl = 14 + Math.random() * 8;
+      ctx.fillStyle = C.accent;
+      ctx.beginPath(); ctx.moveTo(-4, 16); ctx.quadraticCurveTo(0, 16 + fl * 1.3, 4, 16); ctx.closePath(); ctx.fill();
+      ctx.fillStyle = C.flame;
+      ctx.beginPath(); ctx.moveTo(-2, 16); ctx.quadraticCurveTo(0, 16 + fl * 0.7, 2, 16); ctx.closePath(); ctx.fill();
+    }
+    ctx.fillStyle = C.soft;
+    ctx.beginPath(); ctx.moveTo(-5, 6); ctx.lineTo(-11, 17); ctx.lineTo(-5, 15); ctx.closePath(); ctx.fill();
+    ctx.beginPath(); ctx.moveTo(5, 6); ctx.lineTo(11, 17); ctx.lineTo(5, 15); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = C.fg;
+    ctx.fillRect(-5, -10, 10, 26);
+    ctx.beginPath(); ctx.moveTo(-5, -10); ctx.quadraticCurveTo(-5, -22, 0, -28); ctx.quadraticCurveTo(5, -22, 5, -10); ctx.closePath(); ctx.fill();
+    ctx.restore();
+  }
+
+  function drawRecovery(x, y, kind, has, t, C) {
+    ctx.save(); ctx.translate(x, y);
+    ctx.strokeStyle = C.muted; ctx.lineWidth = 1;
+    if (has && kind === 'parachute') {
+      ctx.fillStyle = C.accent;
+      ctx.beginPath(); ctx.moveTo(-24, -44); ctx.quadraticCurveTo(0, -78, 24, -44); ctx.quadraticCurveTo(0, -50, -24, -44); ctx.fill();
+      ctx.beginPath(); ctx.moveTo(-24, -44); ctx.lineTo(0, -12); ctx.lineTo(24, -44); ctx.moveTo(0, -48); ctx.lineTo(0, -12); ctx.stroke();
+    } else if (has) {
+      ctx.strokeStyle = C.accent; ctx.lineWidth = 5;
+      ctx.beginPath(); ctx.moveTo(0, -12);
+      for (var i = 1; i <= 12; i++) ctx.lineTo(Math.sin(i * 0.9 + t * 8) * 5, -12 - i * 4);
+      ctx.stroke(); ctx.lineWidth = 1;
+    }
+    // nose cone hanging on its own line
+    ctx.strokeStyle = C.muted; ctx.beginPath(); ctx.moveTo(0, -12); ctx.quadraticCurveTo(-14, -6, -16, 2); ctx.stroke();
+    ctx.fillStyle = C.fg;
+    ctx.beginPath(); ctx.moveTo(-20, 2); ctx.quadraticCurveTo(-16, -6, -12, 2); ctx.closePath(); ctx.fill();
+    // body hanging
+    ctx.fillStyle = C.soft;
+    ctx.beginPath(); ctx.moveTo(-4, 18); ctx.lineTo(-9, 26); ctx.lineTo(-4, 24); ctx.closePath(); ctx.fill();
+    ctx.beginPath(); ctx.moveTo(4, 18); ctx.lineTo(9, 26); ctx.lineTo(4, 24); ctx.closePath(); ctx.fill();
+    ctx.fillStyle = C.fg; ctx.fillRect(-4, -10, 8, 34);
+    ctx.restore();
+  }
+
+  /* ---------- Charts ---------- */
+  var hoverT = null, playT = null;
+
+  function prepCanvas(cv) {
+    var dpr = window.devicePixelRatio || 1, W = cv.clientWidth, H = cv.clientHeight;
+    if (!W || !H) return null;
+    if (cv.width !== Math.round(W * dpr) || cv.height !== Math.round(H * dpr)) { cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr); }
+    var c = cv.getContext('2d'); c.setTransform(dpr, 0, 0, dpr, 0, 0); c.clearRect(0, 0, W, H);
+    return { c: c, W: W, H: H };
+  }
+
+  // o: { series:[{pts:[[x,y]], color}], xMax, yMax, yUnit, xUnit, events:[{t,label}], hlines:[{v,label}], marks:[{x,y,label}], cursor:{t,color} }
+  function plot(cv, o) {
+    var p = prepCanvas(cv); if (!p) return null;
+    var c = p.c, W = p.W, H = p.H;
+    var L = 58, R = 16, B = 30;
+    var C = { soft: css('--soft'), muted: css('--muted'), line: css('--line'), fg: css('--fg'), accentSoft: css('--accent-soft') };
+    // Lay out event labels in rows so none overlap.
+    c.font = '12px ' + css('--mono');
+    var X0 = function (v) { return L + v / o.xMax * (W - L - R); };
+    var rowsEnd = [], placed = [];
+    (o.events || []).filter(function (e) { return e.t >= 0 && e.t <= o.xMax; })
+      .sort(function (a, b) { return a.t - b.t; })
+      .forEach(function (e) {
+        var w = c.measureText(e.label).width, x = X0(e.t);
+        var left = Math.max(L + 2, Math.min(W - R - w, x - w / 2));
+        var row = 0; while (rowsEnd[row] != null && rowsEnd[row] + 10 > left) row++;
+        rowsEnd[row] = left + w;
+        placed.push({ t: e.t, label: e.label, left: left, row: row });
+      });
+    var ROW = 16, T = 12 + Math.max(1, rowsEnd.length) * ROW;
+    var yStep = niceStep(o.yMax || 1, 4), yTop = Math.max(yStep, Math.ceil((o.yMax || 1) * 1.08 / yStep) * yStep);
+    var X = function (v) { return L + v / o.xMax * (W - L - R); };
+    var Y = function (v) { return H - B - v / yTop * (H - B - T); };
+    c.font = '12px ' + css('--mono'); c.lineWidth = 1;
+    // grid
+    c.textAlign = 'right'; c.textBaseline = 'middle';
+    for (var v = 0; v <= yTop + 1e-9; v += yStep) {
+      c.strokeStyle = C.line; c.globalAlpha = 0.7; c.beginPath(); c.moveTo(L, Y(v)); c.lineTo(W - R, Y(v)); c.stroke(); c.globalAlpha = 1;
+      c.fillStyle = C.muted; c.fillText((Math.round(v * 10) / 10).toLocaleString(), L - 8, Y(v));
+    }
+    c.save(); c.translate(14, (T + H - B) / 2); c.rotate(-Math.PI / 2); c.textAlign = 'center'; c.fillText(o.yUnit, 0, 0); c.restore();
+    var xStep = niceStep(o.xMax, W > 600 ? 8 : 4);
+    c.textAlign = 'center'; c.textBaseline = 'top';
+    for (var xv = 0; xv <= o.xMax + 1e-9; xv += xStep) c.fillText((Math.round(xv * 100) / 100) + (xv === 0 ? '' : ''), X(xv), H - B + 8);
+    c.textAlign = 'right'; c.fillText(o.xUnit, W - R, H - B + 8 + 0);
+    c.strokeStyle = C.soft; c.beginPath(); c.moveTo(L, T - 6); c.lineTo(L, H - B); c.lineTo(W - R, H - B); c.stroke();
+    // events
+    placed.forEach(function (e) {
+      var ly = T - 6 - e.row * ROW;
+      c.strokeStyle = C.muted; c.setLineDash([3, 4]); c.beginPath(); c.moveTo(X(e.t), e.row === 0 ? ly + 2 : T - 2); c.lineTo(X(e.t), H - B); c.stroke(); c.setLineDash([]);
+      c.fillStyle = C.muted; c.textBaseline = 'bottom'; c.textAlign = 'left';
+      c.fillText(e.label, e.left, ly);
+    });
+    // horizontal reference lines
+    (o.hlines || []).forEach(function (h) {
+      c.strokeStyle = C.soft; c.setLineDash([6, 5]); c.beginPath(); c.moveTo(L, Y(h.v)); c.lineTo(W - R, Y(h.v)); c.stroke(); c.setLineDash([]);
+      c.fillStyle = C.soft; c.textAlign = 'right'; c.textBaseline = 'bottom'; c.fillText(h.label, W - R, Y(h.v) - 4);
+    });
+    // series: soft area + line
+    (o.series || []).forEach(function (s) {
+      var pts = s.pts; if (!pts.length) return;
+      c.beginPath(); c.moveTo(X(pts[0][0]), Y(0));
+      pts.forEach(function (q) { c.lineTo(X(q[0]), Y(q[1])); });
+      c.lineTo(X(pts[pts.length - 1][0]), Y(0)); c.closePath();
+      c.fillStyle = s.color; c.globalAlpha = 0.14; c.fill(); c.globalAlpha = 1;
+      c.beginPath(); pts.forEach(function (q, i) { if (i) c.lineTo(X(q[0]), Y(q[1])); else c.moveTo(X(q[0]), Y(q[1])); });
+      c.strokeStyle = s.color; c.lineWidth = 2.25; c.lineJoin = 'round'; c.stroke(); c.lineWidth = 1;
+    });
+    // labelled points
+    (o.marks || []).forEach(function (m) {
+      c.fillStyle = m.color; c.beginPath(); c.arc(X(m.x), Y(m.y), 4.5, 0, Math.PI * 2); c.fill();
+      c.fillStyle = C.fg; c.font = '600 12px ' + css('--mono'); c.textBaseline = 'bottom';
+      c.textAlign = X(m.x) > W - 120 ? 'right' : 'left'; c.fillText(m.label, X(m.x) + (c.textAlign === 'left' ? 8 : -8), Y(m.y) - 4);
+      c.font = '12px ' + css('--mono');
+    });
+    // cursor (playback or hover)
+    if (o.cursor && o.cursor.t != null && o.cursor.t <= o.xMax) {
+      var cx = X(o.cursor.t);
+      c.strokeStyle = o.cursor.color || C.accentSoft; c.lineWidth = 1.5; c.beginPath(); c.moveTo(cx, T); c.lineTo(cx, H - B); c.stroke(); c.lineWidth = 1;
+      (o.series || []).forEach(function (s) {
+        if (o.cursor.y == null) return;
+        c.fillStyle = s.color; c.beginPath(); c.arc(cx, Y(o.cursor.y), 5, 0, Math.PI * 2); c.fill();
+        c.strokeStyle = css('--panel'); c.lineWidth = 2; c.stroke(); c.lineWidth = 1;
+      });
+    }
+    return { L: L, R: R, W: W, xMax: o.xMax };
+  }
+
+  function drawThrust() {
+    var cv = $('thrust-chart');
+    if (!motorIn) { prepCanvas(cv); $('thrust-kpis').textContent = ''; $('thrust-sub').textContent = ''; return; }
+    var mo = motorIn, pts = [], peak = { t: 0, v: 0 };
+    for (var i = 0; i <= 240; i++) {
+      var t = mo.burn * i / 240, v = mo.thrust(Math.min(t, mo.burn - 1e-6));
+      if (i === 240) v = 0;
+      pts.push([t, v]); if (v > peak.v) peak = { t: t, v: v };
+    }
+    pts.unshift([0, 0]);
+    var exact = null; var qc = engineCode(val('engine'));
+    ENGINES.forEach(function (e) { if (engineCode(e) === qc) exact = e; });
+    $('thrust-sub').textContent = (exact || ('Class ' + mo.cls + ' engine')) + '. Curve estimated from the engine code.';
+    var k = $('thrust-kpis'); k.textContent = '';
+    [['Total impulse', mo.I.toFixed(1) + ' N·s'], ['Peak thrust', peak.v.toFixed(1) + ' N'], ['Average thrust', mo.avg + ' N'], ['Burn time', mo.burn.toFixed(2) + ' s']].forEach(function (r) {
+      var d = document.createElement('div'), dt = document.createElement('dt'), dd = document.createElement('dd');
+      dt.textContent = r[0]; dd.textContent = r[1]; d.appendChild(dt); d.appendChild(dd); k.appendChild(d);
+    });
+    plot(cv, {
+      series: [{ pts: pts, color: css('--accent') }],
+      xMax: Math.max(mo.burn * 1.08, 0.1), yMax: peak.v, yUnit: 'Thrust (N)', xUnit: 's',
+      hlines: [{ v: mo.avg, label: 'Average ' + mo.avg + ' N' }],
+      marks: [{ x: peak.t, y: peak.v, color: css('--accent'), label: 'Peak ' + peak.v.toFixed(1) + ' N' }],
+      events: [{ t: mo.burn, label: 'Burnout' }]
+    });
+  }
+
+  function flightRange() {
+    if (!flight) return 1;
+    if (state.range === 'ascent') return Math.min(flight.tEnd, Math.max((flight.tDep != null ? flight.tDep : flight.tApo) + 2, motorIn.burn + 1));
+    return flight.tEnd;
+  }
+  function sampleAt(t) {
+    var i = Math.max(0, Math.min(flight.path.length - 1, Math.round(t / STEP)));
+    return flight.path[i];
+  }
+
+  function drawFlightCharts(cursorT) {
+    var a = $('alt-chart'), s = $('spd-chart');
+    if (!flight || flight.noLift) { prepCanvas(a); prepCanvas(s); $('readout').textContent = flight ? 'No flight: the engine couldn\'t lift the rocket.' : ''; return; }
+    var imp = state.units === 'imperial';
+    var lenF = imp ? 1 / 0.3048 : 1, spdF = imp ? 1 / 0.44704 : 1;
+    var xMax = flightRange();
+    var altPts = [], spdPts = [], every = Math.max(1, Math.round(xMax / STEP / 900));
+    for (var i = 0; i < flight.path.length; i += every) {
+      var p = flight.path[i]; if (p.t > xMax) break;
+      altPts.push([p.t, p.y * lenF]); spdPts.push([p.t, p.v * spdF]);
+    }
+    var events = [{ t: motorIn.burn, label: 'Burnout' }, { t: flight.tApo, label: 'Apogee' }];
+    if (flight.tDep != null && Math.abs(flight.tDep - flight.tApo) > xMax * 0.04) events.push({ t: flight.tDep, label: 'Deploy' });
+    else if (flight.tDep != null) events[1].label = 'Apogee + deploy';
+    events.push({ t: flight.tEnd, label: flight.crashed ? 'Impact' : 'Landing' });
+    var useT = hoverT != null ? hoverT : cursorT;
+    var cur = useT != null ? sampleAt(useT) : null;
+    var col = hoverT != null ? css('--muted') : css('--accent-soft');
+    var maxSpd = 0; spdPts.forEach(function (q) { if (q[1] > maxSpd) maxSpd = q[1]; });
+    plot(a, {
+      series: [{ pts: altPts, color: css('--alt') }], xMax: xMax, yMax: flight.apo * lenF, yUnit: imp ? 'Altitude (ft)' : 'Altitude (m)', xUnit: 's',
+      events: events, marks: [{ x: flight.tApo, y: flight.apo * lenF, color: css('--alt'), label: fmt(flight.apo, 'len') }],
+      cursor: cur ? { t: useT, y: cur.y * lenF, color: col } : null
+    });
+    plot(s, {
+      series: [{ pts: spdPts, color: css('--accent') }], xMax: xMax, yMax: maxSpd, yUnit: imp ? 'Speed (mph)' : 'Speed (m/s)', xUnit: 's',
+      events: events, marks: [{ x: flight.tVmax, y: flight.vMax * spdF, color: css('--accent'), label: fmt(flight.vMax, 'spd') }],
+      cursor: cur ? { t: useT, y: cur.v * spdF, color: col } : null
+    });
+    $('readout').textContent = cur
+      ? 'T+ ' + useT.toFixed(1) + ' s    Altitude ' + fmt(cur.y, 'len') + '    Speed ' + fmt(cur.v, 'spd')
+      : 'Tap or hover a graph to read values.';
+  }
+
+  ['alt-chart', 'spd-chart'].forEach(function (id) {
+    var cv = $(id);
+    function at(e) {
+      if (!flight || flight.noLift) return;
+      var r = cv.getBoundingClientRect(), L = 58, R = 16;
+      var frac = (e.clientX - r.left - L) / (r.width - L - R);
+      if (frac < 0 || frac > 1) { hoverT = null; } else hoverT = frac * flightRange();
+      drawFlightCharts(anim.done ? null : anim.t);
+    }
+    cv.addEventListener('pointermove', at);
+    cv.addEventListener('pointerdown', at);
+    cv.addEventListener('pointerleave', function () { hoverT = null; if (flight) drawFlightCharts(anim.done ? null : anim.t); });
+  });
+
+  /* ---------- Google Form ---------- */
+  // Google Forms that collect feedback. Each field maps a site value to that form's question id.
+  var SURVEY_FORM = {
+    url: 'https://docs.google.com/forms/d/e/1FAIpQLSfAAGfxTi_VowEQJ1XbbO9zcdY0sLWDPJXGvQ_jaAKSL19_OA/formResponse',
+    fields: { navigate: 'entry.591439662', read: 'entry.1795151566', understand: 'entry.337135193',
+              useAgain: 'entry.483831547', other: 'entry.1878770966', rocketInfo: 'entry.39971103' }
+  };
+  var REPORT_FORM = {
+    url: 'https://docs.google.com/forms/d/e/1FAIpQLSfgIkJ-2zuOtihGTdc0Lzkj5ujgDUpuyPZpQH-lEZqS-9i3Hw/formResponse',
+    fields: { kind: 'entry.1330773900', details: 'entry.107690135' }
+  };
+  function sendToForm(FORM, values) {
+    if (!FORM.url) return Promise.reject({ code: 'no_form' });
+    var body = new URLSearchParams();
+    Object.keys(values).forEach(function (k) {
+      var v = values[k];
+      if (FORM.fields[k] && v != null && v !== '') body.append(FORM.fields[k], String(v));
+    });
+    // Google Forms doesn't allow reading the reply from another site, so a sent request counts as success.
+    return fetch(FORM.url, { method: 'POST', mode: 'no-cors', body: body });
+  }
+  function openReport() {
+    $('survey').hidden = true;
+    var p = $('report-panel'); p.hidden = false;
+    $('rep-status').textContent = ''; $('rep-status').className = 'hint';
+    p.scrollIntoView({ behavior: reduceMotion ? 'auto' : 'smooth', block: 'start' });
+    setTimeout(function () { $('rep-kind').focus(); }, 300);
+  }
+  document.querySelectorAll('[data-open-report]').forEach(function (b) { b.addEventListener('click', openReport); });
+  $('report-close').addEventListener('click', function () { $('report-panel').hidden = true; });
+  $('rep-send').addEventListener('click', function () {
+    var text = $('rep-text').value.trim(), st = $('rep-status'), btn = $('rep-send');
+    st.className = 'hint';
+    if (!text) { st.className = 'hint bad'; st.textContent = 'Add a few details so the problem can be fixed.'; $('rep-text').focus(); return; }
+    btn.disabled = true; st.textContent = 'Sending…';
+    var context = 'Engine: ' + (val('engine') || 'none') +
+      ' · Kit: ' + (state.kit === 'yes' ? (state.kitPicked || val('kit') || 'none') : 'custom specs') +
+      ' · Units: ' + state.units;
+    sendToForm(REPORT_FORM, { kind: $('rep-kind').value, details: text + '\n\n' + context })
+    .then(function () {
+      st.className = 'hint ok'; st.textContent = 'Sent, thanks!';
+      $('rep-text').value = '';
+    }).catch(function (e) {
+      st.className = 'hint bad';
+      st.textContent = e && e.code === 'no_form' ? 'Reports aren\'t set up yet. Check back soon.'
+        : 'Couldn\'t send the report. Check your internet connection and try again.';
+    }).then(function () { btn.disabled = false; });
+  });
+
+  /* ---------- Survey ---------- */
+  function openSurvey() {
+    $('report-panel').hidden = true;
+    var p = $('survey'); p.hidden = false;
+    p.scrollIntoView({ behavior: reduceMotion ? 'auto' : 'smooth', block: 'start' });
+  }
+  document.querySelectorAll('[data-open-survey]').forEach(function (b) { b.addEventListener('click', openSurvey); });
+  $('survey-close').addEventListener('click', function () { $('survey').hidden = true; });
+  document.querySelectorAll('.rate').forEach(function (fs) {
+    var q = fs.getAttribute('data-q'), sc = fs.querySelector('.scale');
+    var ENDS = { useAgain: ['Not likely', 'Very likely'], read: ['Cluttered', 'Very clear'] };
+    var ends = ENDS[q] || ['Hard', 'Easy'];
+    var lo = document.createElement('span'); lo.className = 'end'; lo.textContent = ends[0]; sc.appendChild(lo);
+    for (var n = 1; n <= 5; n++) {
+      var id = 'sv-' + q + '-' + n;
+      var inp = document.createElement('input'); inp.type = 'radio'; inp.name = 'sv-' + q; inp.id = id; inp.value = n;
+      var lb = document.createElement('label'); lb.setAttribute('for', id); lb.textContent = n;
+      lb.setAttribute('aria-label', n + ' out of 5');
+      sc.appendChild(inp); sc.appendChild(lb);
+    }
+    var hi = document.createElement('span'); hi.className = 'end'; hi.textContent = ends[1]; sc.appendChild(hi);
+  });
+  $('survey-form').addEventListener('submit', function (e) {
+    e.preventDefault();
+    var st = $('sv-status'), btn = $('sv-send'), ratings = {}, any = false;
+    document.querySelectorAll('.rate').forEach(function (fs) {
+      var q = fs.getAttribute('data-q'), c = fs.querySelector('input:checked');
+      ratings[q] = c ? +c.value : null; if (c) any = true;
+    });
+    var other = $('sv-else').value.trim(), rocket = $('sv-rocket').value.trim();
+    st.className = 'hint';
+    if (!any && !other && !rocket) { st.className = 'hint bad'; st.textContent = 'Answer at least one question before sending.'; return; }
+    btn.disabled = true; st.textContent = 'Sending…';
+    sendToForm(SURVEY_FORM, { navigate: ratings.navigate, read: ratings.read, understand: ratings.understand, useAgain: ratings.useAgain,
+      other: other, rocketInfo: rocket
+    }).then(function () {
+      st.className = 'hint ok'; st.textContent = 'Sent, thanks for the feedback!';
+      $('survey-form').reset();
+    }).catch(function (err) {
+      st.className = 'hint bad';
+      st.textContent = err && err.code === 'no_form' ? 'The survey isn\'t set up yet. Check back soon.'
+        : 'Couldn\'t send your feedback. Check your internet connection and try again.';
+    }).then(function () { btn.disabled = false; });
+  });
+
+  /* ---------- Full lists ---------- */
+  var CLASS_ORDER = ['1/8A','1/4A','1/2A','A','B','C','D','E','F','G','H','I','J','K','L','M','N','O'];
+  var browse = { mode: 'engines', maker: 'all', cls: 'all', items: [] };
+  function makerOf(name) { var w = name.split(' ')[0]; return w === 'LOC' ? 'LOC Precision' : w; }
+  function openBrowse(mode) {
+    browse.mode = mode; browse.maker = 'all'; browse.cls = 'all';
+    $('browse-q').value = '';
+    $('browse-h').textContent = mode === 'engines' ? 'All engines' : 'All kits';
+    $('browse-q').placeholder = mode === 'engines' ? 'Filter, like H128 or Cesaroni' : 'Filter, like Bertha or LOC';
+    renderBrowse();
+    var d = $('browse');
+    if (d.showModal) { if (!d.open) d.showModal(); } else d.setAttribute('open', '');
+    setTimeout(function () { $('browse-q').focus(); }, 30);
+  }
+  function closeBrowse() { var d = $('browse'); if (d.close) d.close(); else d.removeAttribute('open'); }
+  function chipRow(el, values, current, key) {
+    el.textContent = '';
+    values.forEach(function (v) {
+      var b = document.createElement('button'); b.type = 'button'; b.className = 'chip' + (v[0] === current ? ' on' : '');
+      b.textContent = v[1]; b.setAttribute('aria-pressed', String(v[0] === current));
+      b.addEventListener('click', function () { browse[key] = v[0]; renderBrowse(); });
+      el.appendChild(b);
+    });
+  }
+  function renderBrowse() {
+    var q = norm($('browse-q').value), imp = state.units === 'imperial', list = [];
+    if (browse.mode === 'engines') {
+      var all = ENGINES.map(function (e) { return { name: e, mo: motorFrom(e), maker: makerOf(e) }; }).filter(function (x) { return x.mo; });
+      all.sort(function (a, b) { return CLASS_ORDER.indexOf(a.mo.cls) - CLASS_ORDER.indexOf(b.mo.cls) || a.mo.avg - b.mo.avg || a.name.localeCompare(b.name); });
+      var makers = [['all', 'All makers']], seen = {};
+      all.forEach(function (x) { if (!seen[x.maker]) { seen[x.maker] = 1; makers.push([x.maker, x.maker]); } });
+      chipRow($('browse-makers'), makers, browse.maker, 'maker');
+      var letters = [['all', 'All classes']], seenL = {};
+      all.forEach(function (x) { var l = x.mo.letter; if (!seenL[l]) { seenL[l] = 1; letters.push([l, l]); } });
+      chipRow($('browse-classes'), letters, browse.cls, 'cls');
+      list = all.filter(function (x) {
+        return (browse.maker === 'all' || x.maker === browse.maker) && (browse.cls === 'all' || x.mo.letter === browse.cls) &&
+          (!q || norm(x.name).indexOf(q) >= 0 || engineCode(x.name).indexOf(engineCode(q)) >= 0);
+      });
+    } else {
+      $('browse-classes').textContent = '';
+      var kits = KITS.concat(customKits()).map(function (k) { return { k: k, maker: k.custom ? 'Your kits' : makerOf(k.name) }; });
+      kits.sort(function (a, b) { return a.maker.localeCompare(b.maker) || a.k.name.localeCompare(b.k.name); });
+      var km = [['all', 'All makers']], seenK = {};
+      kits.forEach(function (x) { if (!seenK[x.maker]) { seenK[x.maker] = 1; km.push([x.maker, x.maker]); } });
+      chipRow($('browse-makers'), km, browse.maker, 'maker');
+      list = kits.filter(function (x) {
+        return (browse.maker === 'all' || x.maker === browse.maker) && (!q || norm(x.k.name + ' ' + (x.k.alias || '')).indexOf(q) >= 0 || kitScore(q, x.k.name + ' ' + (x.k.alias || '')) >= 1.3);
+      });
+    }
+    browse.items = list;
+    var box = $('browse-list'); box.textContent = '';
+    $('browse-count').textContent = list.length + (list.length === 1 ? (browse.mode === 'engines' ? ' engine' : ' kit') : (browse.mode === 'engines' ? ' engines' : ' kits')) + '. Click one to use it.';
+    list.forEach(function (x, i) {
+      var b = document.createElement('button'); b.type = 'button'; b.className = 'browse-row'; b.setAttribute('data-i', i);
+      var nm = document.createElement('span'); nm.className = 'nm';
+      var meta = document.createElement('span'); meta.className = 'meta';
+      var sub = document.createElement('span'); sub.className = 'sub';
+      if (browse.mode === 'engines') {
+        var mo = x.mo;
+        nm.textContent = x.name;
+        meta.textContent = mo.cls + ' · ' + mo.avg + ' N avg · ' + (mo.exactI ? '' : '≈') + Math.round(mo.I).toLocaleString() + ' N·s';
+        sub.textContent = mo.delay != null ? mo.delay + ' s delay' : mo.adj != null ? 'Adjustable delay, up to ' + mo.adj + ' s' : mo.plugged ? 'Plugged, needs electronics for deployment' : 'Delay not in the code';
+      } else {
+        var k = x.k;
+        nm.textContent = k.name;
+        meta.textContent = fromSI(k.len, 'len') + ' × ' + fromSI(k.dia, 'len') + ' ' + (imp ? 'in' : 'mm') + ' · ' + fromSI(k.dry, 'mass') + ' ' + (imp ? 'oz' : 'g');
+        sub.textContent = k.engines ? 'Engines: ' + k.engines : (k.custom ? 'One of your saved kits' : '');
+      }
+      b.appendChild(nm); b.appendChild(meta); if (sub.textContent) b.appendChild(sub);
+      box.appendChild(b);
+    });
+    if (!list.length) { var p = document.createElement('div'); p.className = 'hint'; p.style.padding = '16px 24px'; p.textContent = 'Nothing matches. Try a shorter filter.'; box.appendChild(p); }
+  }
+  $('browse-list').addEventListener('click', function (e) {
+    var row = e.target.closest && e.target.closest('.browse-row'); if (!row) return;
+    var x = browse.items[+row.getAttribute('data-i')]; if (!x) return;
+    closeBrowse();
+    if (browse.mode === 'engines') { $('engine').value = x.name; render(); save(); $('engine').focus(); }
+    else { state.kit = 'yes'; pickKit(x.k); }
+  });
+  $('browse-q').addEventListener('input', function (e) { e.stopPropagation(); renderBrowse(); });
+  $('browse-close').addEventListener('click', closeBrowse);
+  $('browse').addEventListener('click', function (e) { if (e.target === $('browse')) closeBrowse(); });
+  document.querySelectorAll('[data-browse]').forEach(function (b) {
+    b.addEventListener('click', function () { openBrowse(b.getAttribute('data-browse')); });
+  });
+
+  $('replay').addEventListener('click', function () { if (flight) runFlight(); });
+  $('skip').addEventListener('click', function () { if (flight) finish(); });
+  window.addEventListener('resize', function () {
+    if ($('results-view').hidden) return;
+    draw(anim.t); drawThrust(); drawFlightCharts(anim.done ? null : anim.t);
+  });
+
+  load(); render();
+})();
+</script>
+
+</body>
+</html>
